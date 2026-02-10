@@ -4,10 +4,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { LeftPresetsPanel } from "@/components/panels/LeftPresetsPanel";
 import { LeftEnvironmentPanel } from "@/components/panels/LeftEnvironmentPanel";
 import { LeftSeedPanel } from "@/components/panels/LeftSeedPanel";
+import { RockPresetsPanel } from "@/components/panels/rock/RockPresetsPanel";
 import { X } from "lucide-react";
 
 export function UnifiedLeftDrawer() {
-  const { leftDrawerOpen, leftPanel, leftDrawerWidthPx, setLeftDrawerOpen } = useProVegLayout();
+  const { leftDrawerOpen, leftPanel, leftDrawerWidthPx, setLeftDrawerOpen, studioMode } = useProVegLayout();
   if (!leftDrawerOpen) return null;
   const config = LEFT_PANELS.find((p) => p.id === leftPanel);
   return (
@@ -18,7 +19,7 @@ export function UnifiedLeftDrawer() {
       </div>
       <ScrollArea className="flex-1">
         <div className="p-3">
-          {leftPanel === "presets" && <LeftPresetsPanel />}
+          {leftPanel === "presets" && (studioMode === "rock" ? <RockPresetsPanel /> : <LeftPresetsPanel />)}
           {leftPanel === "environment" && <LeftEnvironmentPanel />}
           {leftPanel === "seed" && <LeftSeedPanel />}
           {leftPanel === "diagnostics" && <div className="text-xs text-muted-foreground">Diagnostics coming soon</div>}

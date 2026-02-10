@@ -22,11 +22,15 @@ export function SliderRow({
   keyAlt,
   format = (v) => v.toFixed(2),
 }: SliderRowProps) {
-  const { setTreeParam } = useProVegLayout();
+  const { setTreeParam, setRockParam } = useProVegLayout();
 
   const set = (v: number) => {
-    setTreeParam(keyPrimary, v);
-    if (keyAlt) setTreeParam(keyAlt, v);
+    if (keyPrimary.startsWith("rock:")) {
+      setRockParam(keyPrimary.slice(5), v);
+    } else {
+      setTreeParam(keyPrimary, v);
+      if (keyAlt) setTreeParam(keyAlt, v);
+    }
   };
 
   return (

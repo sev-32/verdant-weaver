@@ -1,5 +1,5 @@
 import { useProVegLayout } from "@/contexts/ProVegLayoutContext";
-import { RIGHT_PANELS } from "@/config/workspaceScenes";
+import { RIGHT_PANELS, ROCK_RIGHT_PANELS } from "@/config/workspaceScenes";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getIcon } from "@/config/workspaceIcons";
 import { TrunkPanel } from "@/components/panels/right/TrunkPanel";
@@ -8,12 +8,18 @@ import { LeavesPanel } from "@/components/panels/right/LeavesPanel";
 import { BarkRootsPanel } from "@/components/panels/right/BarkRootsPanel";
 import { WindLODPanel } from "@/components/panels/right/WindLODPanel";
 import { SpaceColonizationPanel } from "@/components/panels/right/SpaceColonizationPanel";
+import { RockShapePanel } from "@/components/panels/rock/RockShapePanel";
+import { RockDisplacementPanel } from "@/components/panels/rock/RockDisplacementPanel";
+import { RockErosionPanel } from "@/components/panels/rock/RockErosionPanel";
+import { RockMaterialPanel } from "@/components/panels/rock/RockMaterialPanel";
 import { X } from "lucide-react";
 
 export function UnifiedRightDrawer() {
-  const { rightDrawerOpen, rightPanel, rightSubTab, rightDrawerWidthPx, setRightDrawerOpen, setRightSubTab } = useProVegLayout();
+  const { rightDrawerOpen, rightPanel, rightSubTab, rightDrawerWidthPx, setRightDrawerOpen, setRightSubTab, studioMode } = useProVegLayout();
   if (!rightDrawerOpen) return null;
-  const config = RIGHT_PANELS.find((p) => p.id === rightPanel);
+
+  const panels = studioMode === "rock" ? ROCK_RIGHT_PANELS : RIGHT_PANELS;
+  const config = panels.find((p) => p.id === rightPanel);
   const effectiveSubTab = rightSubTab || config?.subTabs[0]?.id || "";
 
   return (
@@ -42,12 +48,18 @@ export function UnifiedRightDrawer() {
       )}
       <ScrollArea className="flex-1">
         <div className="p-3 space-y-3">
+          {/* Tree panels */}
           {rightPanel === "trunk" && <TrunkPanel subTab={effectiveSubTab} />}
           {rightPanel === "branching" && <BranchingPanel subTab={effectiveSubTab} />}
           {rightPanel === "leaves" && <LeavesPanel subTab={effectiveSubTab} />}
           {rightPanel === "bark-roots" && <BarkRootsPanel subTab={effectiveSubTab} />}
           {rightPanel === "wind-lod" && <WindLODPanel subTab={effectiveSubTab} />}
           {rightPanel === "space-colonization" && <SpaceColonizationPanel subTab={effectiveSubTab} />}
+          {/* Rock panels */}
+          {rightPanel === "rock-shape" && <RockShapePanel />}
+          {rightPanel === "rock-displacement" && <RockDisplacementPanel />}
+          {rightPanel === "rock-erosion" && <RockErosionPanel />}
+          {rightPanel === "rock-material" && <RockMaterialPanel />}
         </div>
       </ScrollArea>
     </div>

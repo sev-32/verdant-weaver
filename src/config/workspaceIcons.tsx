@@ -2,14 +2,16 @@ import {
   Bookmark, Cloud, Hash, Activity, TreePine, GitBranch, Leaf,
   Mountain, Wind, Grid3X3, Circle, CircleDot, Move, Merge,
   AlertTriangle, Layers, Minus, Palette, Box, Sprout, Eye,
-  Target, PanelLeftClose, PanelRightClose, type LucideIcon,
+  Target, PanelLeftClose, PanelRightClose, Gem, Droplets,
+  Paintbrush, Hexagon, type LucideIcon,
 } from "lucide-react";
 
 const ICON_MAP: Record<string, LucideIcon> = {
   Bookmark, Cloud, Hash, Activity, TreePine, GitBranch, Leaf,
   Mountain, Wind, Grid3X3, Circle, CircleDot, Move, Merge,
   AlertTriangle, Layers, Minus, Palette, Box, Sprout, Eye,
-  Target, PanelLeftClose, PanelRightClose,
+  Target, PanelLeftClose, PanelRightClose, Gem, Droplets,
+  Paintbrush, Hexagon,
   Root: Sprout,
   Network: GitBranch,
 };
