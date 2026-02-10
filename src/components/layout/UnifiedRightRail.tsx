@@ -1,13 +1,14 @@
 import { useProVegLayout } from "@/contexts/ProVegLayoutContext";
-import { RIGHT_PANELS } from "@/config/workspaceScenes";
+import { RIGHT_PANELS, ROCK_RIGHT_PANELS } from "@/config/workspaceScenes";
 import { getIcon } from "@/config/workspaceIcons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function UnifiedRightRail() {
-  const { rightPanel, rightDrawerOpen, openRightPanel } = useProVegLayout();
+  const { rightPanel, rightDrawerOpen, openRightPanel, studioMode } = useProVegLayout();
+  const panels = studioMode === "rock" ? ROCK_RIGHT_PANELS : RIGHT_PANELS;
   return (
     <div className="w-10 bg-editor-rail border-l border-border flex flex-col items-center py-2 gap-1 shrink-0 z-10">
-      {RIGHT_PANELS.map((p) => {
+      {panels.map((p) => {
         const Icon = getIcon(p.icon);
         const active = rightDrawerOpen && rightPanel === p.id;
         return (

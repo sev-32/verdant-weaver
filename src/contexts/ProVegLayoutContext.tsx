@@ -1,10 +1,13 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
 import { DEFAULT_TREE_PARAMS, type TreeParams } from "@/types/treeParams";
+import { DEFAULT_ROCK_PARAMS, type RockParams } from "@/types/rockParams";
 
 const MIN_DRAWER = 280;
 const MAX_DRAWER = 480;
 const DEFAULT_LEFT = 300;
 const DEFAULT_RIGHT = 340;
+
+export type StudioMode = "tree" | "rock";
 
 export interface ViewportSettings {
   backgroundColor: string;
@@ -43,6 +46,7 @@ export const DEFAULT_VIEWPORT_SETTINGS: ViewportSettings = {
 export type GroundLayerType = "simple" | "quick-grass";
 
 interface ProVegLayoutState {
+  studioMode: StudioMode;
   leftDrawerOpen: boolean;
   leftPanel: string;
   leftDrawerWidthPx: number;
@@ -55,6 +59,7 @@ interface ProVegLayoutState {
   paused: boolean;
   showStats: boolean;
   treeParams: TreeParams;
+  rockParams: RockParams;
   seed: number;
   isPlaying: boolean;
   groundLayer: GroundLayerType;
@@ -62,6 +67,7 @@ interface ProVegLayoutState {
 }
 
 interface ProVegLayoutContextValue extends ProVegLayoutState {
+  setStudioMode: (mode: StudioMode) => void;
   setLeftDrawerOpen: (v: boolean) => void;
   openLeftPanel: (id: string) => void;
   setLeftDrawerWidthPx: (v: number) => void;
@@ -75,6 +81,9 @@ interface ProVegLayoutContextValue extends ProVegLayoutState {
   setShowStats: (v: boolean) => void;
   setTreeParams: (partial: Partial<TreeParams>) => void;
   setTreeParam: (key: string, value: number | string | boolean) => void;
+  setRockParams: (partial: Partial<RockParams>) => void;
+  setRockParam: (key: string, value: number | string | boolean) => void;
+  resetRockToDefaults: () => void;
   setSeed: (v: number) => void;
   setIsPlaying: (v: boolean) => void;
   setGroundLayer: (v: GroundLayerType) => void;
@@ -85,6 +94,7 @@ interface ProVegLayoutContextValue extends ProVegLayoutState {
 }
 
 const defaultState: ProVegLayoutState = {
+  studioMode: "tree",
   leftDrawerOpen: false,
   leftPanel: "presets",
   leftDrawerWidthPx: DEFAULT_LEFT,
@@ -97,6 +107,7 @@ const defaultState: ProVegLayoutState = {
   paused: false,
   showStats: false,
   treeParams: { ...DEFAULT_TREE_PARAMS },
+  rockParams: { ...DEFAULT_ROCK_PARAMS },
   seed: 1337,
   isPlaying: true,
   groundLayer: "simple",
@@ -116,10 +127,29 @@ export function ProVegLayoutProvider({ children }: { children: React.ReactNode }
     setState((s) => ({ ...s, treeParams: { ...s.treeParams, ...partial } }));
   }, []);
 
+  const setRockParam = useCallback((key: string, value: number | string | boolean) => {
+    setState((s) => ({ ...s, rockParams: { ...s.rockParams, [key]: value } }));
+  }, []);
+
+  const setRockParams = useCallback((partial: Partial<RockParams>) => {
+    setState((s) => ({ ...s, rockParams: { ...s.rockParams, ...partial } }));
+  }, []);
+
   const value: ProVegLayoutContextValue = {
     ...state,
     setTreeParam,
     setTreeParams,
+    setRockParam,
+    setRockParams,
+    resetRockToDefaults: () => setState((s) => ({ ...s, rockParams: { ...DEFAULT_ROCK_PARAMS } })),
+    setStudioMode: (mode) =>
+      setState((s) => ({
+        ...s,
+        studioMode: mode,
+        rightPanel: mode === "rock" ? "rock-shape" : "trunk",
+        rightSubTab: "",
+        leftPanel: "presets",
+      })),
     setLeftDrawerOpen: (v) => setState((s) => ({ ...s, leftDrawerOpen: v })),
     openLeftPanel: (id) =>
       setState((s) => ({
