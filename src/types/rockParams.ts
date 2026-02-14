@@ -9,14 +9,30 @@ export interface RockPreset {
   params: Partial<RockParams>;
 }
 
+export interface SavedRock {
+  id: string;
+  name: string;
+  params: RockParams;
+  seed: number;
+  timestamp: number;
+}
+
+export interface SceneRock {
+  id: string;
+  savedRockId: string;
+  position: [number, number, number];
+  rotation: [number, number, number];
+  scale: number;
+}
+
 export const DEFAULT_ROCK_PARAMS: RockParams = {
   // Shape
-  rockType: "boulder",        // boulder | cliff | mountain | pillar | arch
-  scale: 1.5,                 // overall scale in meters
+  rockType: "boulder",
+  scale: 1.5,
   scaleX: 1.0,
   scaleY: 1.0,
   scaleZ: 1.0,
-  subdivisions: 5,            // icosphere subdivisions (detail level)
+  subdivisions: 5,
   seed: 42,
 
   // Displacement
@@ -29,8 +45,8 @@ export const DEFAULT_ROCK_PARAMS: RockParams = {
   // Erosion
   erosionStrength: 0.25,
   erosionSharpness: 1.4,
-  erosionDirection: 0.7,       // 0 = uniform, 1 = top-down gravity
-  erosionChannels: 0.3,        // water channel erosion
+  erosionDirection: 0.7,
+  erosionChannels: 0.3,
   erosionSmoothing: 0.15,
 
   // Fracture
@@ -65,14 +81,54 @@ export const DEFAULT_ROCK_PARAMS: RockParams = {
   crystallineScale: 0.3,
   crystallineColor: "#b8c4d8",
 
-  // Moss / vegetation
+  // Quartz deposits
+  quartzStrength: 0.0,
+  quartzScale: 0.4,
+  quartzColor: "#e8e4d8",
+  quartzRoughness: 0.15,
+  quartzMetalness: 0.0,
+
+  // Mica / Glitter
+  micaStrength: 0.0,
+  micaDensity: 12,
+  micaColor: "#d4c8a0",
+  micaMetalness: 0.6,
+
+  // Mineral veins
+  veinStrength: 0.0,
+  veinScale: 2.0,
+  veinColor: "#c8b890",
+  veinThickness: 0.08,
+  veinMetalness: 0.1,
+
+  // Moss types
   mossColor: "#3a5a28",
-  mossThreshold: 0.6,         // how high on normals moss appears
+  mossThreshold: 0.6,
   mossCoverage: 0.0,
+  mossType: "clump",        // clump | sheet | drape | stringy
+  mossHeight: 0.3,
+  mossVariation: 0.2,
+
+  // Lichen
+  lichenStrength: 0.0,
+  lichenColor: "#b8c86a",
+  lichenScale: 4.0,
+  lichenThreshold: 0.5,
 
   // Environment
-  groundEmbed: 0.15,          // how much rock is embedded in ground
+  groundEmbed: 0.15,
   rotation: 0,
+
+  // Developer / Quality
+  wireframe: false,
+  shadowQuality: 2048,
+  pixelRatio: 0,             // 0 = auto
+  maxSubdivisions: 6,
+  showNormals: false,
+  showUVs: false,
+  flatShading: false,
+  toneMappingExposure: 1.0,
+  fogDensity: 0.02,
 };
 
 export const ROCK_PRESETS: RockPreset[] = [
@@ -96,6 +152,8 @@ export const ROCK_PRESETS: RockPreset[] = [
       crystallineColor: "#c8b8a8",
       baseColorVariation: 0.18,
       roughness: 0.85,
+      quartzStrength: 0.15,
+      micaStrength: 0.2,
     },
   },
   {
@@ -118,6 +176,8 @@ export const ROCK_PRESETS: RockPreset[] = [
       layeringWarp: 0.35,
       roughness: 0.94,
       baseColorVariation: 0.12,
+      veinStrength: 0.2,
+      veinColor: "#d4a870",
     },
   },
   {
@@ -161,6 +221,7 @@ export const ROCK_PRESETS: RockPreset[] = [
       layeringFrequency: 6,
       roughness: 0.82,
       baseColorVariation: 0.08,
+      lichenStrength: 0.3,
     },
   },
   {
@@ -185,12 +246,14 @@ export const ROCK_PRESETS: RockPreset[] = [
       roughness: 0.72,
       metalness: 0.05,
       baseColorVariation: 0.05,
+      micaStrength: 0.3,
+      micaColor: "#a0a0b0",
     },
   },
   {
     id: "volcanic",
     name: "Volcanic",
-    description: "Porous ignite rock with vesicular texture and rough surface",
+    description: "Porous igneous rock with vesicular texture and rough surface",
     params: {
       baseColor: "#2e2828",
       secondaryColor: "#1a1616",

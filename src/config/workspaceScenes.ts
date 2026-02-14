@@ -92,4 +92,12 @@ export const ROCK_RIGHT_PANELS: RightPanelConfig[] = [
     id: "rock-material", label: "Material", icon: "Paintbrush",
     subTabs: [],
   },
+  {
+    id: "rock-scene", label: "Scene", icon: "Layers",
+    subTabs: [],
+  },
+  {
+    id: "rock-developer", label: "Developer", icon: "Settings",
+    subTabs: [],
+  },
 ];

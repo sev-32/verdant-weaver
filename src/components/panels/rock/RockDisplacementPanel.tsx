@@ -15,8 +15,8 @@ export function RockDisplacementPanel() {
       </div>
       <div className="editor-section">
         <div className="editor-section-title">Surface</div>
+        <SliderRow label="Bump Scale" value={rockParams.surfaceBumpScale as number} min={0} max={0.2} step={0.005} keyPrimary="rock:surfaceBumpScale" />
         <SliderRow label="Pitting" value={rockParams.surfacePitting as number} min={0} max={1} step={0.01} keyPrimary="rock:surfacePitting" />
-        <SliderRow label="Bump Scale" value={rockParams.surfaceBumpScale as number} min={0} max={0.15} step={0.005} keyPrimary="rock:surfaceBumpScale" />
       </div>
     </div>
   );

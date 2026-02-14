@@ -12,7 +12,6 @@ function v3normalize(a: Vec3): Vec3 {
 function v3cross(a: Vec3, b: Vec3): Vec3 {
   return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
 }
-function v3dot(a: Vec3, b: Vec3): number { return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]; }
 
 function mulberry32(seed: number) {
   let s = seed | 0;
@@ -33,7 +32,6 @@ function hexToRgb(hex: string): Vec3 {
   ];
 }
 
-// 3D noise
 function hash31(x: number, y: number, z: number): number {
   let n = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453;
   return n - Math.floor(n);
@@ -76,7 +74,6 @@ function fbm3(x: number, y: number, z: number, octaves: number, lacunarity: numb
   return v;
 }
 
-// Voronoi for fractures
 function voronoi3(x: number, y: number, z: number): { dist1: number; dist2: number } {
   const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z);
   let d1 = 999, d2 = 999;
@@ -95,7 +92,6 @@ function voronoi3(x: number, y: number, z: number): { dist1: number; dist2: numb
   return { dist1: d1, dist2: d2 };
 }
 
-// Icosphere generation
 function createIcosphere(subdivisions: number): { positions: Vec3[]; indices: number[] } {
   const t = (1 + Math.sqrt(5)) / 2;
   const verts: Vec3[] = [
@@ -150,6 +146,8 @@ export interface RockGeometry {
   colors: number[];
   uvs: number[];
   tangents: number[];
+  roughnessMap: number[];   // per-vertex roughness
+  metalnessMap: number[];   // per-vertex metalness
   indices: number[];
   meta: { vertCount: number; triCount: number; bounds: Vec3 };
 }
@@ -198,15 +196,36 @@ export function generateRockGeometry(params: RockParams, seedOverride?: number):
   const crystStr = (params.crystallineStrength as number) ?? 0.0;
   const crystScale = (params.crystallineScale as number) ?? 0.3;
 
+  // Advanced materials
+  const quartzStr = (params.quartzStrength as number) ?? 0.0;
+  const quartzScale = (params.quartzScale as number) ?? 0.4;
+  const quartzColor = hexToRgb((params.quartzColor as string) || "#e8e4d8");
+  const quartzRough = (params.quartzRoughness as number) ?? 0.15;
+  const quartzMetal = (params.quartzMetalness as number) ?? 0.0;
+
+  const micaStr = (params.micaStrength as number) ?? 0.0;
+  const micaDens = (params.micaDensity as number) ?? 12;
+  const micaColor = hexToRgb((params.micaColor as string) || "#d4c8a0");
+  const micaMetal = (params.micaMetalness as number) ?? 0.6;
+
+  const veinStr = (params.veinStrength as number) ?? 0.0;
+  const veinScale = (params.veinScale as number) ?? 2.0;
+  const veinColor = hexToRgb((params.veinColor as string) || "#c8b890");
+  const veinThickness = (params.veinThickness as number) ?? 0.08;
+  const veinMetal = (params.veinMetalness as number) ?? 0.1;
+
+  const lichenStr = (params.lichenStrength as number) ?? 0.0;
+  const lichenColor = hexToRgb((params.lichenColor as string) || "#b8c86a");
+  const lichenScale = (params.lichenScale as number) ?? 4.0;
+  const lichenThreshold = (params.lichenThreshold as number) ?? 0.5;
+
   const baseColor = hexToRgb(baseColorHex);
   const secColor = hexToRgb(secColorHex);
 
-  // Phase offset for seed variation
   const px = rng() * 100;
   const py = rng() * 100;
   const pz = rng() * 100;
 
-  // Generate icosphere
   const ico = createIcosphere(subs);
   const verts = ico.positions.map(v => [...v] as Vec3);
 
@@ -215,54 +234,45 @@ export function generateRockGeometry(params: RockParams, seedOverride?: number):
     const v = verts[i];
     const n = v3normalize(v);
 
-    // Anisotropic scaling
     let sv: Vec3 = [v[0] * sx, v[1] * sy, v[2] * sz];
 
-    // FBM displacement
     const nx = (sv[0] + px) * dispFreq;
     const ny = (sv[1] + py) * dispFreq;
     const nz = (sv[2] + pz) * dispFreq;
     let disp = fbm3(nx, ny, nz, dispOct, dispLac, dispPers) - 0.5;
 
-    // Erosion: smooth tops, roughen sides
-    const upDot = n[1]; // how much it faces up
+    const upDot = n[1];
     if (erosStr > 0) {
       const gravityFactor = erosDir * Math.max(0, upDot);
       const smoothFactor = erosSmooth * gravityFactor;
       disp *= 1 - smoothFactor;
 
-      // Water channel erosion on sides
       if (erosChan > 0 && upDot < 0.3) {
         const chanNoise = noise3(sv[0] * 4 + px, sv[1] * 8, sv[2] * 4 + pz);
         const chan = Math.pow(chanNoise, erosSharp) * erosChan * erosStr;
         disp -= chan;
       }
 
-      // General erosion rounding
       disp -= erosStr * Math.pow(Math.max(0, upDot), erosSharp) * 0.3;
     }
 
-    // Fracture lines (Voronoi edge detection)
     if (fracStr > 0) {
       const vor = voronoi3(sv[0] * fracDens + px, sv[1] * fracDens + py, sv[2] * fracDens + pz);
       const edge = 1 - Math.pow(Math.min(1, (vor.dist2 - vor.dist1) * fracSharp), 0.5);
       disp -= edge * fracDepth * fracStr;
     }
 
-    // Sedimentary layering
     if (layerStr > 0) {
       const warp = noise3(sv[0] * 2 + px, sv[1] * 2, sv[2] * 2 + pz) * layerWarp;
       const layer = Math.sin((sv[1] + warp) * layerFreq * Math.PI) * 0.5 + 0.5;
       disp += (layer - 0.5) * layerStr * 0.08;
     }
 
-    // Crystalline faceting
     if (crystStr > 0) {
       const vor = voronoi3(sv[0] / crystScale + px, sv[1] / crystScale + py, sv[2] / crystScale + pz);
       disp += (vor.dist1 - 0.5) * crystStr * 0.15;
     }
 
-    // Surface pitting (small cavities)
     if (pitting > 0) {
       const pit = noise3(sv[0] * 12 + px, sv[1] * 12 + py, sv[2] * 12 + pz);
       if (pit > 0.65) {
@@ -270,7 +280,6 @@ export function generateRockGeometry(params: RockParams, seedOverride?: number):
       }
     }
 
-    // Apply displacement
     const finalScale = scale * (1 + disp * dispStr);
     verts[i] = [
       n[0] * finalScale * sx,
@@ -278,7 +287,6 @@ export function generateRockGeometry(params: RockParams, seedOverride?: number):
       n[2] * finalScale * sz,
     ];
 
-    // Embed in ground
     if (groundEmbed > 0) {
       verts[i][1] += scale * groundEmbed;
     }
@@ -298,12 +306,17 @@ export function generateRockGeometry(params: RockParams, seedOverride?: number):
   }
   for (let i = 0; i < normals.length; i++) normals[i] = v3normalize(normals[i]);
 
-  // Compute vertex colors, UVs, and tangents
+  // Build output arrays
   const positions: number[] = [];
   const normalsFlat: number[] = [];
   const colors: number[] = [];
   const uvs: number[] = [];
   const tangents: number[] = [];
+  const roughnessMap: number[] = [];
+  const metalnessMap: number[] = [];
+
+  const baseRoughness = (params.roughness as number) ?? 0.88;
+  const baseMetalness = (params.metalness as number) ?? 0.02;
 
   for (let i = 0; i < verts.length; i++) {
     const v = verts[i];
@@ -311,37 +324,32 @@ export function generateRockGeometry(params: RockParams, seedOverride?: number):
     positions.push(v[0], v[1], v[2]);
     normalsFlat.push(n[0], n[1], n[2]);
 
-    // Triplanar UV projection - blend based on normal direction
+    // Triplanar UV — use world position
     const absN: Vec3 = [Math.abs(n[0]), Math.abs(n[1]), Math.abs(n[2])];
     let u: number, uv_v: number;
     if (absN[1] > absN[0] && absN[1] > absN[2]) {
-      // Top/bottom face → project XZ
-      u = v[0] * 0.5;
-      uv_v = v[2] * 0.5;
+      u = v[0] * 0.5; uv_v = v[2] * 0.5;
     } else if (absN[0] > absN[2]) {
-      // Side X face → project YZ
-      u = v[2] * 0.5;
-      uv_v = v[1] * 0.5;
+      u = v[2] * 0.5; uv_v = v[1] * 0.5;
     } else {
-      // Side Z face → project XY
-      u = v[0] * 0.5;
-      uv_v = v[1] * 0.5;
+      u = v[0] * 0.5; uv_v = v[1] * 0.5;
     }
     uvs.push(u, uv_v);
 
-    // Compute tangent (aligned to dominant UV direction)
+    // Tangent
     let tangent: Vec3;
     if (absN[1] > absN[0] && absN[1] > absN[2]) {
       tangent = v3normalize(v3cross(n, [0, 0, 1]));
-    } else if (absN[0] > absN[2]) {
-      tangent = v3normalize(v3cross(n, [0, 1, 0]));
     } else {
       tangent = v3normalize(v3cross(n, [0, 1, 0]));
     }
-    // w component = handedness
     tangents.push(tangent[0], tangent[1], tangent[2], 1.0);
 
-    // Color based on height, slope, noise
+    // Per-vertex roughness & metalness
+    let vertRough = baseRoughness;
+    let vertMetal = baseMetalness;
+
+    // Color blending
     const heightNorm = (v[1] + scale) / (scale * 2);
     const slope = n[1];
     const colorNoise = noise3(v[0] * 3 + px, v[1] * 3 + py, v[2] * 3 + pz);
@@ -354,6 +362,7 @@ export function generateRockGeometry(params: RockParams, seedOverride?: number):
     const cv = (rng() - 0.5) * colorVar;
     r += cv; g += cv * 0.8; b += cv * 0.6;
 
+    // Layering color stripes
     if (layerStr > 0) {
       const warp = noise3(v[0] * 2 + px, v[1] * 2, v[2] * 2 + pz) * layerWarp;
       const layer = Math.sin((v[1] / scale + warp) * layerFreq * Math.PI) * 0.5 + 0.5;
@@ -361,14 +370,77 @@ export function generateRockGeometry(params: RockParams, seedOverride?: number):
       r -= darken; g -= darken; b -= darken * 0.8;
     }
 
+    // Quartz deposits
+    if (quartzStr > 0) {
+      const qNoise = noise3(v[0] / quartzScale + px * 2, v[1] / quartzScale + py * 2, v[2] / quartzScale + pz * 2);
+      const qNoise2 = noise3(v[0] * 6 + px, v[1] * 6 + py, v[2] * 6 + pz);
+      const qFactor = Math.max(0, qNoise * qNoise2 - (1 - quartzStr) * 0.3) * 2;
+      if (qFactor > 0) {
+        const qf = Math.min(1, qFactor);
+        r += (quartzColor[0] - r) * qf;
+        g += (quartzColor[1] - g) * qf;
+        b += (quartzColor[2] - b) * qf;
+        vertRough += (quartzRough - vertRough) * qf;
+        vertMetal += (quartzMetal - vertMetal) * qf;
+      }
+    }
+
+    // Mica glitter
+    if (micaStr > 0) {
+      const mNoise = noise3(v[0] * micaDens + px * 3, v[1] * micaDens + py * 3, v[2] * micaDens + pz * 3);
+      if (mNoise > (1 - micaStr * 0.3)) {
+        const mf = (mNoise - (1 - micaStr * 0.3)) / (micaStr * 0.3);
+        r += (micaColor[0] - r) * mf * 0.6;
+        g += (micaColor[1] - g) * mf * 0.6;
+        b += (micaColor[2] - b) * mf * 0.6;
+        vertRough *= (1 - mf * 0.5);
+        vertMetal += (micaMetal - vertMetal) * mf;
+      }
+    }
+
+    // Mineral veins
+    if (veinStr > 0) {
+      const vx = v[0] * veinScale + px;
+      const vy = v[1] * veinScale + py;
+      const vz = v[2] * veinScale + pz;
+      const vor = voronoi3(vx, vy, vz);
+      const edgeDist = vor.dist2 - vor.dist1;
+      if (edgeDist < veinThickness) {
+        const vf = 1 - edgeDist / veinThickness;
+        const vfScaled = vf * veinStr;
+        r += (veinColor[0] - r) * vfScaled;
+        g += (veinColor[1] - g) * vfScaled;
+        b += (veinColor[2] - b) * vfScaled;
+        vertRough *= (1 - vfScaled * 0.3);
+        vertMetal += (veinMetal - vertMetal) * vfScaled;
+      }
+    }
+
+    // Moss on upward-facing surfaces
     if (mossCoverage > 0 && slope > mossThreshold) {
       const mossNoise = noise3(v[0] * 5 + px, v[1] * 5 + py, v[2] * 5 + pz);
       const mf = Math.min(1, mossCoverage * mossNoise * 2 * (slope - mossThreshold) / (1 - mossThreshold));
       r += (mossColor[0] - r) * mf;
       g += (mossColor[1] - g) * mf;
       b += (mossColor[2] - b) * mf;
+      vertRough += (0.95 - vertRough) * mf;
+      vertMetal *= (1 - mf);
     }
 
+    // Lichen patches
+    if (lichenStr > 0) {
+      const lNoise = noise3(v[0] * lichenScale + px * 1.5, v[1] * lichenScale + py * 1.5, v[2] * lichenScale + pz * 1.5);
+      const lNoise2 = noise3(v[0] * lichenScale * 3 + px, v[1] * lichenScale * 3, v[2] * lichenScale * 3 + pz);
+      if (lNoise > lichenThreshold && slope > 0.2) {
+        const lf = Math.min(1, (lNoise - lichenThreshold) * 3 * lichenStr * lNoise2);
+        r += (lichenColor[0] - r) * lf;
+        g += (lichenColor[1] - g) * lf;
+        b += (lichenColor[2] - b) * lf;
+        vertRough += (0.9 - vertRough) * lf;
+      }
+    }
+
+    // Darken crevices (AO approximation)
     const crevice = 1 - Math.max(0, (noise3(v[0] * 8, v[1] * 8, v[2] * 8) - 0.3) * 0.3);
     r *= crevice; g *= crevice; b *= crevice;
 
@@ -377,6 +449,8 @@ export function generateRockGeometry(params: RockParams, seedOverride?: number):
       Math.max(0, Math.min(1, g)),
       Math.max(0, Math.min(1, b)),
     );
+    roughnessMap.push(Math.max(0, Math.min(1, vertRough)));
+    metalnessMap.push(Math.max(0, Math.min(1, vertMetal)));
   }
 
   const bounds: Vec3 = [0, 0, 0];
@@ -392,6 +466,8 @@ export function generateRockGeometry(params: RockParams, seedOverride?: number):
     colors,
     uvs,
     tangents,
+    roughnessMap,
+    metalnessMap,
     indices: ico.indices,
     meta: {
       vertCount: verts.length,
