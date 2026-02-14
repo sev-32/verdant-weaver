@@ -38,6 +38,7 @@ export default function Rock3DPreview({ params, seed = 42, className = "" }: Roc
     if (ctx.rockMesh) {
       ctx.scene.remove(ctx.rockMesh);
       ctx.rockMesh.geometry.dispose();
+      if (ctx.rockMesh.material instanceof THREE.Material) ctx.rockMesh.material.dispose();
     }
 
     const geo = generateRockGeometry(paramsRef.current, seedRef.current);
@@ -48,31 +49,56 @@ export default function Rock3DPreview({ params, seed = 42, className = "" }: Roc
     bufGeo.setAttribute("color", new THREE.Float32BufferAttribute(geo.colors, 3));
     bufGeo.setAttribute("uv", new THREE.Float32BufferAttribute(geo.uvs, 2));
     bufGeo.setAttribute("tangent", new THREE.Float32BufferAttribute(geo.tangents, 4));
+    // Per-vertex roughness/metalness as custom attributes
+    bufGeo.setAttribute("aRoughness", new THREE.Float32BufferAttribute(geo.roughnessMap, 1));
+    bufGeo.setAttribute("aMetalness", new THREE.Float32BufferAttribute(geo.metalnessMap, 1));
     bufGeo.setIndex(geo.indices);
 
     const roughness = (paramsRef.current.roughness as number) ?? 0.88;
     const metalness = (paramsRef.current.metalness as number) ?? 0.02;
     const bumpScale = (paramsRef.current.surfaceBumpScale as number) ?? 0.04;
+    const wireframe = (paramsRef.current.wireframe as boolean) ?? false;
+    const flatShading = (paramsRef.current.flatShading as boolean) ?? false;
 
     const mat = new THREE.MeshStandardMaterial({
       vertexColors: true,
       roughness,
       metalness,
       side: THREE.FrontSide,
-      flatShading: false,
+      flatShading,
+      wireframe,
     });
 
-    // Inject procedural normal/roughness maps via shader
+    // Inject procedural normal/roughness using WORLD position (not view position)
     mat.onBeforeCompile = (shader) => {
       shader.uniforms.uBumpScale = { value: bumpScale };
-      shader.uniforms.uRoughnessMod = { value: roughness };
 
-      // Add noise functions and uniforms to fragment shader
+      // Add world position varying to vertex shader
+      shader.vertexShader = shader.vertexShader.replace(
+        "#include <common>",
+        `#include <common>
+        varying vec3 vWorldPos;
+        attribute float aRoughness;
+        attribute float aMetalness;
+        varying float vVertRoughness;
+        varying float vVertMetalness;`
+      );
+      shader.vertexShader = shader.vertexShader.replace(
+        "#include <worldpos_vertex>",
+        `#include <worldpos_vertex>
+        vWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
+        vVertRoughness = aRoughness;
+        vVertMetalness = aMetalness;`
+      );
+
+      // Fragment shader: use world pos for stable texturing
       shader.fragmentShader = shader.fragmentShader.replace(
         "#include <common>",
         `#include <common>
+        varying vec3 vWorldPos;
+        varying float vVertRoughness;
+        varying float vVertMetalness;
         uniform float uBumpScale;
-        uniform float uRoughnessMod;
 
         float rockHash(vec3 p) {
           float n = sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453;
@@ -110,31 +136,40 @@ export default function Rock3DPreview({ params, seed = 42, className = "" }: Roc
         `
       );
 
-      // Perturb normal with procedural bump
+      // Perturb normal using WORLD position — stable on camera move
       shader.fragmentShader = shader.fragmentShader.replace(
         "#include <normal_fragment_maps>",
         `#include <normal_fragment_maps>
         {
-          vec3 wp = vViewPosition;
-          float eps = 0.02;
-          float center = rockFbm(wp * 8.0, 4);
-          float dx = rockFbm((wp + vec3(eps, 0.0, 0.0)) * 8.0, 4) - center;
-          float dy = rockFbm((wp + vec3(0.0, eps, 0.0)) * 8.0, 4) - center;
-          float dz = rockFbm((wp + vec3(0.0, 0.0, eps)) * 8.0, 4) - center;
-          vec3 bumpNormal = normalize(normal + vec3(dx, dy, dz) * uBumpScale * 15.0);
+          vec3 wp = vWorldPos;
+          float eps = 0.015;
+          float center = rockFbm(wp * 8.0, 5);
+          float dx = rockFbm((wp + vec3(eps, 0.0, 0.0)) * 8.0, 5) - center;
+          float dy = rockFbm((wp + vec3(0.0, eps, 0.0)) * 8.0, 5) - center;
+          float dz = rockFbm((wp + vec3(0.0, 0.0, eps)) * 8.0, 5) - center;
+          vec3 bumpNormal = normalize(normal + vec3(dx, dy, dz) * uBumpScale * 20.0);
           normal = bumpNormal;
         }
         `
       );
 
-      // Modulate roughness procedurally
+      // Use per-vertex roughness & metalness
       shader.fragmentShader = shader.fragmentShader.replace(
         "#include <roughnessmap_fragment>",
         `#include <roughnessmap_fragment>
         {
-          vec3 wp = vViewPosition;
+          vec3 wp = vWorldPos;
           float rNoise = rockFbm(wp * 12.0, 3);
-          roughnessFactor = clamp(uRoughnessMod + (rNoise - 0.5) * 0.2, 0.0, 1.0);
+          roughnessFactor = clamp(vVertRoughness + (rNoise - 0.5) * 0.15, 0.0, 1.0);
+        }
+        `
+      );
+
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <metalnessmap_fragment>",
+        `#include <metalnessmap_fragment>
+        {
+          metalnessFactor = vVertMetalness;
         }
         `
       );
@@ -265,7 +300,10 @@ export default function Rock3DPreview({ params, seed = 42, className = "" }: Roc
         cancelAnimationFrame(ctx.animFrame);
         ctx.renderer.dispose();
         ctx.controls.dispose();
-        if (ctx.rockMesh) ctx.rockMesh.geometry.dispose();
+        if (ctx.rockMesh) {
+          ctx.rockMesh.geometry.dispose();
+          if (ctx.rockMesh.material instanceof THREE.Material) ctx.rockMesh.material.dispose();
+        }
         container.removeChild(ctx.renderer.domElement);
       }
       sceneRef.current = null;
@@ -282,11 +320,16 @@ export default function Rock3DPreview({ params, seed = 42, className = "" }: Roc
     ctx.renderer.toneMappingExposure = viewportSettings.exposure;
   }, [viewportSettings]);
 
+  const showNormals = (params.showNormals as boolean) ?? false;
+  const showUVs = (params.showUVs as boolean) ?? false;
+
   return (
     <div ref={containerRef} className={`relative ${className}`} style={{ position: "absolute", inset: 0 }}>
       <div className="absolute top-3 left-3 flex flex-col gap-1 pointer-events-none z-10">
         <span className="text-[10px] font-mono text-editor-text-dim">Seed: {seed}</span>
         <span className="text-[10px] font-mono text-editor-text-dim">Rock Editor</span>
+        {showNormals && <span className="text-[10px] font-mono text-amber-400">Normal Debug</span>}
+        {showUVs && <span className="text-[10px] font-mono text-cyan-400">UV Debug</span>}
       </div>
     </div>
   );

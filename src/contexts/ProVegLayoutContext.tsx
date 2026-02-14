@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
 import { DEFAULT_TREE_PARAMS, type TreeParams } from "@/types/treeParams";
-import { DEFAULT_ROCK_PARAMS, type RockParams } from "@/types/rockParams";
+import { DEFAULT_ROCK_PARAMS, type RockParams, type SavedRock, type SceneRock } from "@/types/rockParams";
 
 const MIN_DRAWER = 280;
 const MAX_DRAWER = 480;
@@ -64,6 +64,8 @@ interface ProVegLayoutState {
   isPlaying: boolean;
   groundLayer: GroundLayerType;
   viewportSettings: ViewportSettings;
+  savedRocks: SavedRock[];
+  sceneRocks: SceneRock[];
 }
 
 interface ProVegLayoutContextValue extends ProVegLayoutState {
@@ -89,6 +91,11 @@ interface ProVegLayoutContextValue extends ProVegLayoutState {
   setGroundLayer: (v: GroundLayerType) => void;
   setViewportSettings: (patch: Partial<ViewportSettings>) => void;
   resetToDefaults: () => void;
+  saveCurrentRock: (name: string) => void;
+  deleteSavedRock: (id: string) => void;
+  addRockToScene: (savedRockId: string) => void;
+  removeRockFromScene: (sceneRockId: string) => void;
+  updateSceneRock: (sceneRockId: string, patch: Partial<SceneRock>) => void;
   minDrawerWidth: number;
   maxDrawerWidth: number;
 }
@@ -112,6 +119,8 @@ const defaultState: ProVegLayoutState = {
   isPlaying: true,
   groundLayer: "simple",
   viewportSettings: { ...DEFAULT_VIEWPORT_SETTINGS },
+  savedRocks: [],
+  sceneRocks: [],
 };
 
 const ProVegLayoutContext = createContext<ProVegLayoutContextValue | null>(null);
@@ -133,6 +142,54 @@ export function ProVegLayoutProvider({ children }: { children: React.ReactNode }
 
   const setRockParams = useCallback((partial: Partial<RockParams>) => {
     setState((s) => ({ ...s, rockParams: { ...s.rockParams, ...partial } }));
+  }, []);
+
+  const saveCurrentRock = useCallback((name: string) => {
+    setState((s) => {
+      const rock: SavedRock = {
+        id: `rock_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        name,
+        params: { ...s.rockParams },
+        seed: s.seed,
+        timestamp: Date.now(),
+      };
+      return { ...s, savedRocks: [...s.savedRocks, rock] };
+    });
+  }, []);
+
+  const deleteSavedRock = useCallback((id: string) => {
+    setState((s) => ({
+      ...s,
+      savedRocks: s.savedRocks.filter((r) => r.id !== id),
+      sceneRocks: s.sceneRocks.filter((sr) => sr.savedRockId !== id),
+    }));
+  }, []);
+
+  const addRockToScene = useCallback((savedRockId: string) => {
+    setState((s) => {
+      const offset = s.sceneRocks.length * 2.5;
+      const sr: SceneRock = {
+        id: `sr_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        savedRockId,
+        position: [offset, 0, 0],
+        rotation: [0, 0, 0],
+        scale: 1,
+      };
+      return { ...s, sceneRocks: [...s.sceneRocks, sr] };
+    });
+  }, []);
+
+  const removeRockFromScene = useCallback((sceneRockId: string) => {
+    setState((s) => ({ ...s, sceneRocks: s.sceneRocks.filter((sr) => sr.id !== sceneRockId) }));
+  }, []);
+
+  const updateSceneRock = useCallback((sceneRockId: string, patch: Partial<SceneRock>) => {
+    setState((s) => ({
+      ...s,
+      sceneRocks: s.sceneRocks.map((sr) =>
+        sr.id === sceneRockId ? { ...sr, ...patch } : sr
+      ),
+    }));
   }, []);
 
   const value: ProVegLayoutContextValue = {
@@ -180,6 +237,11 @@ export function ProVegLayoutProvider({ children }: { children: React.ReactNode }
     setViewportSettings: (patch) =>
       setState((s) => ({ ...s, viewportSettings: { ...s.viewportSettings, ...patch } })),
     resetToDefaults: () => setState(defaultState),
+    saveCurrentRock,
+    deleteSavedRock,
+    addRockToScene,
+    removeRockFromScene,
+    updateSceneRock,
     minDrawerWidth: MIN_DRAWER,
     maxDrawerWidth: MAX_DRAWER,
   };
