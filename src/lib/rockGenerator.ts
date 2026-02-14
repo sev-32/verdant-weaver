@@ -148,6 +148,8 @@ export interface RockGeometry {
   positions: number[];
   normals: number[];
   colors: number[];
+  uvs: number[];
+  tangents: number[];
   indices: number[];
   meta: { vertCount: number; triCount: number; bounds: Vec3 };
 }
@@ -296,10 +298,12 @@ export function generateRockGeometry(params: RockParams, seedOverride?: number):
   }
   for (let i = 0; i < normals.length; i++) normals[i] = v3normalize(normals[i]);
 
-  // Compute vertex colors
+  // Compute vertex colors, UVs, and tangents
   const positions: number[] = [];
   const normalsFlat: number[] = [];
   const colors: number[] = [];
+  const uvs: number[] = [];
+  const tangents: number[] = [];
 
   for (let i = 0; i < verts.length; i++) {
     const v = verts[i];
@@ -307,22 +311,49 @@ export function generateRockGeometry(params: RockParams, seedOverride?: number):
     positions.push(v[0], v[1], v[2]);
     normalsFlat.push(n[0], n[1], n[2]);
 
+    // Triplanar UV projection - blend based on normal direction
+    const absN: Vec3 = [Math.abs(n[0]), Math.abs(n[1]), Math.abs(n[2])];
+    let u: number, uv_v: number;
+    if (absN[1] > absN[0] && absN[1] > absN[2]) {
+      // Top/bottom face → project XZ
+      u = v[0] * 0.5;
+      uv_v = v[2] * 0.5;
+    } else if (absN[0] > absN[2]) {
+      // Side X face → project YZ
+      u = v[2] * 0.5;
+      uv_v = v[1] * 0.5;
+    } else {
+      // Side Z face → project XY
+      u = v[0] * 0.5;
+      uv_v = v[1] * 0.5;
+    }
+    uvs.push(u, uv_v);
+
+    // Compute tangent (aligned to dominant UV direction)
+    let tangent: Vec3;
+    if (absN[1] > absN[0] && absN[1] > absN[2]) {
+      tangent = v3normalize(v3cross(n, [0, 0, 1]));
+    } else if (absN[0] > absN[2]) {
+      tangent = v3normalize(v3cross(n, [0, 1, 0]));
+    } else {
+      tangent = v3normalize(v3cross(n, [0, 1, 0]));
+    }
+    // w component = handedness
+    tangents.push(tangent[0], tangent[1], tangent[2], 1.0);
+
     // Color based on height, slope, noise
     const heightNorm = (v[1] + scale) / (scale * 2);
-    const slope = n[1]; // upward-facing = 1
+    const slope = n[1];
     const colorNoise = noise3(v[0] * 3 + px, v[1] * 3 + py, v[2] * 3 + pz);
 
-    // Blend base & secondary based on height + noise
     const blend = Math.min(1, Math.max(0, heightNorm * 0.5 + colorNoise * 0.5));
     let r = baseColor[0] + (secColor[0] - baseColor[0]) * blend;
     let g = baseColor[1] + (secColor[1] - baseColor[1]) * blend;
     let b = baseColor[2] + (secColor[2] - baseColor[2]) * blend;
 
-    // Color variation
     const cv = (rng() - 0.5) * colorVar;
     r += cv; g += cv * 0.8; b += cv * 0.6;
 
-    // Layering color stripes
     if (layerStr > 0) {
       const warp = noise3(v[0] * 2 + px, v[1] * 2, v[2] * 2 + pz) * layerWarp;
       const layer = Math.sin((v[1] / scale + warp) * layerFreq * Math.PI) * 0.5 + 0.5;
@@ -330,7 +361,6 @@ export function generateRockGeometry(params: RockParams, seedOverride?: number):
       r -= darken; g -= darken; b -= darken * 0.8;
     }
 
-    // Moss on upward-facing surfaces
     if (mossCoverage > 0 && slope > mossThreshold) {
       const mossNoise = noise3(v[0] * 5 + px, v[1] * 5 + py, v[2] * 5 + pz);
       const mf = Math.min(1, mossCoverage * mossNoise * 2 * (slope - mossThreshold) / (1 - mossThreshold));
@@ -339,7 +369,6 @@ export function generateRockGeometry(params: RockParams, seedOverride?: number):
       b += (mossColor[2] - b) * mf;
     }
 
-    // Darken crevices (AO approximation)
     const crevice = 1 - Math.max(0, (noise3(v[0] * 8, v[1] * 8, v[2] * 8) - 0.3) * 0.3);
     r *= crevice; g *= crevice; b *= crevice;
 
@@ -361,6 +390,8 @@ export function generateRockGeometry(params: RockParams, seedOverride?: number):
     positions,
     normals: normalsFlat,
     colors,
+    uvs,
+    tangents,
     indices: ico.indices,
     meta: {
       vertCount: verts.length,

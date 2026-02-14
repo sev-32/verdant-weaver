@@ -46,10 +46,13 @@ export default function Rock3DPreview({ params, seed = 42, className = "" }: Roc
     bufGeo.setAttribute("position", new THREE.Float32BufferAttribute(geo.positions, 3));
     bufGeo.setAttribute("normal", new THREE.Float32BufferAttribute(geo.normals, 3));
     bufGeo.setAttribute("color", new THREE.Float32BufferAttribute(geo.colors, 3));
+    bufGeo.setAttribute("uv", new THREE.Float32BufferAttribute(geo.uvs, 2));
+    bufGeo.setAttribute("tangent", new THREE.Float32BufferAttribute(geo.tangents, 4));
     bufGeo.setIndex(geo.indices);
 
     const roughness = (paramsRef.current.roughness as number) ?? 0.88;
     const metalness = (paramsRef.current.metalness as number) ?? 0.02;
+    const bumpScale = (paramsRef.current.surfaceBumpScale as number) ?? 0.04;
 
     const mat = new THREE.MeshStandardMaterial({
       vertexColors: true,
@@ -58,6 +61,84 @@ export default function Rock3DPreview({ params, seed = 42, className = "" }: Roc
       side: THREE.FrontSide,
       flatShading: false,
     });
+
+    // Inject procedural normal/roughness maps via shader
+    mat.onBeforeCompile = (shader) => {
+      shader.uniforms.uBumpScale = { value: bumpScale };
+      shader.uniforms.uRoughnessMod = { value: roughness };
+
+      // Add noise functions and uniforms to fragment shader
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <common>",
+        `#include <common>
+        uniform float uBumpScale;
+        uniform float uRoughnessMod;
+
+        float rockHash(vec3 p) {
+          float n = sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453;
+          return fract(n);
+        }
+
+        float rockNoise3(vec3 p) {
+          vec3 i = floor(p);
+          vec3 f = fract(p);
+          vec3 u = f * f * (3.0 - 2.0 * f);
+          float n000 = rockHash(i);
+          float n100 = rockHash(i + vec3(1,0,0));
+          float n010 = rockHash(i + vec3(0,1,0));
+          float n110 = rockHash(i + vec3(1,1,0));
+          float n001 = rockHash(i + vec3(0,0,1));
+          float n101 = rockHash(i + vec3(1,0,1));
+          float n011 = rockHash(i + vec3(0,1,1));
+          float n111 = rockHash(i + vec3(1,1,1));
+          float x0 = mix(n000, n100, u.x);
+          float x1 = mix(n010, n110, u.x);
+          float x2 = mix(n001, n101, u.x);
+          float x3 = mix(n011, n111, u.x);
+          return mix(mix(x0, x1, u.y), mix(x2, x3, u.y), u.z);
+        }
+
+        float rockFbm(vec3 p, int oct) {
+          float v = 0.0; float a = 0.5; float f = 1.0;
+          for (int i = 0; i < 6; i++) {
+            if (i >= oct) break;
+            v += a * rockNoise3(p * f);
+            f *= 2.1; a *= 0.48;
+          }
+          return v;
+        }
+        `
+      );
+
+      // Perturb normal with procedural bump
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <normal_fragment_maps>",
+        `#include <normal_fragment_maps>
+        {
+          vec3 wp = vViewPosition;
+          float eps = 0.02;
+          float center = rockFbm(wp * 8.0, 4);
+          float dx = rockFbm((wp + vec3(eps, 0.0, 0.0)) * 8.0, 4) - center;
+          float dy = rockFbm((wp + vec3(0.0, eps, 0.0)) * 8.0, 4) - center;
+          float dz = rockFbm((wp + vec3(0.0, 0.0, eps)) * 8.0, 4) - center;
+          vec3 bumpNormal = normalize(normal + vec3(dx, dy, dz) * uBumpScale * 15.0);
+          normal = bumpNormal;
+        }
+        `
+      );
+
+      // Modulate roughness procedurally
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <roughnessmap_fragment>",
+        `#include <roughnessmap_fragment>
+        {
+          vec3 wp = vViewPosition;
+          float rNoise = rockFbm(wp * 12.0, 3);
+          roughnessFactor = clamp(uRoughnessMod + (rNoise - 0.5) * 0.2, 0.0, 1.0);
+        }
+        `
+      );
+    };
 
     ctx.rockMesh = new THREE.Mesh(bufGeo, mat);
     ctx.rockMesh.castShadow = true;
@@ -86,7 +167,13 @@ export default function Rock3DPreview({ params, seed = 42, className = "" }: Roc
     const camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 200);
     camera.position.set(4, 2.5, 5);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+    } catch (e) {
+      console.warn("Rock3DPreview: WebGL context unavailable", e);
+      return;
+    }
     renderer.setSize(w, h);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
