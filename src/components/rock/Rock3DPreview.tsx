@@ -3,12 +3,110 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { useProVegLayout } from "@/contexts/ProVegLayoutContext";
 import { generateRockGeometry } from "@/lib/rockGenerator";
+import { mergeRockGeometries } from "@/lib/csgMerge";
 import type { RockParams } from "@/types/rockParams";
 
 interface Rock3DPreviewProps {
   params: RockParams;
   seed?: number;
   className?: string;
+}
+
+function buildMeshFromGeo(geo: ReturnType<typeof generateRockGeometry>, params: RockParams): THREE.Mesh {
+  const bufGeo = new THREE.BufferGeometry();
+  bufGeo.setAttribute("position", new THREE.Float32BufferAttribute(geo.positions, 3));
+  bufGeo.setAttribute("normal", new THREE.Float32BufferAttribute(geo.normals, 3));
+  bufGeo.setAttribute("color", new THREE.Float32BufferAttribute(geo.colors, 3));
+  bufGeo.setAttribute("uv", new THREE.Float32BufferAttribute(geo.uvs, 2));
+  bufGeo.setAttribute("tangent", new THREE.Float32BufferAttribute(geo.tangents, 4));
+  bufGeo.setAttribute("aRoughness", new THREE.Float32BufferAttribute(geo.roughnessMap, 1));
+  bufGeo.setAttribute("aMetalness", new THREE.Float32BufferAttribute(geo.metalnessMap, 1));
+  bufGeo.setIndex(geo.indices);
+
+  const roughness = (params.roughness as number) ?? 0.88;
+  const metalness = (params.metalness as number) ?? 0.02;
+  const bumpScale = (params.surfaceBumpScale as number) ?? 0.04;
+  const wireframe = (params.wireframe as boolean) ?? false;
+  const flatShading = (params.flatShading as boolean) ?? false;
+
+  const mat = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness,
+    metalness,
+    side: THREE.FrontSide,
+    flatShading,
+    wireframe,
+  });
+
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uBumpScale = { value: bumpScale };
+    shader.vertexShader = shader.vertexShader.replace(
+      "#include <common>",
+      `#include <common>
+      varying vec3 vWorldPos;
+      attribute float aRoughness;
+      attribute float aMetalness;
+      varying float vVertRoughness;
+      varying float vVertMetalness;`
+    );
+    shader.vertexShader = shader.vertexShader.replace(
+      "#include <worldpos_vertex>",
+      `#include <worldpos_vertex>
+      vWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
+      vVertRoughness = aRoughness;
+      vVertMetalness = aMetalness;`
+    );
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "#include <common>",
+      `#include <common>
+      varying vec3 vWorldPos;
+      varying float vVertRoughness;
+      varying float vVertMetalness;
+      uniform float uBumpScale;
+      float rockHash(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+      float rockNoise3(vec3 p) {
+        vec3 i = floor(p); vec3 f = fract(p); vec3 u = f*f*(3.0-2.0*f);
+        float n000=rockHash(i); float n100=rockHash(i+vec3(1,0,0));
+        float n010=rockHash(i+vec3(0,1,0)); float n110=rockHash(i+vec3(1,1,0));
+        float n001=rockHash(i+vec3(0,0,1)); float n101=rockHash(i+vec3(1,0,1));
+        float n011=rockHash(i+vec3(0,1,1)); float n111=rockHash(i+vec3(1,1,1));
+        return mix(mix(mix(n000,n100,u.x),mix(n010,n110,u.x),u.y),mix(mix(n001,n101,u.x),mix(n011,n111,u.x),u.y),u.z);
+      }
+      float rockFbm(vec3 p, int oct) {
+        float v=0.0,a=0.5,f=1.0;
+        for(int i=0;i<6;i++){if(i>=oct)break;v+=a*rockNoise3(p*f);f*=2.1;a*=0.48;}
+        return v;
+      }`
+    );
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "#include <normal_fragment_maps>",
+      `#include <normal_fragment_maps>
+      { vec3 wp=vWorldPos; float eps=0.015;
+        float c=rockFbm(wp*8.0,5);
+        float dx=rockFbm((wp+vec3(eps,0,0))*8.0,5)-c;
+        float dy=rockFbm((wp+vec3(0,eps,0))*8.0,5)-c;
+        float dz=rockFbm((wp+vec3(0,0,eps))*8.0,5)-c;
+        normal=normalize(normal+vec3(dx,dy,dz)*uBumpScale*20.0);
+      }`
+    );
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "#include <roughnessmap_fragment>",
+      `#include <roughnessmap_fragment>
+      { float rN=rockFbm(vWorldPos*12.0,3);
+        roughnessFactor=clamp(vVertRoughness+(rN-0.5)*0.15,0.0,1.0);
+      }`
+    );
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "#include <metalnessmap_fragment>",
+      `#include <metalnessmap_fragment>
+      { metalnessFactor=vVertMetalness; }`
+    );
+  };
+
+  const mesh = new THREE.Mesh(bufGeo, mat);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  return mesh;
 }
 
 export default function Rock3DPreview({ params, seed = 42, className = "" }: Rock3DPreviewProps) {
@@ -18,7 +116,7 @@ export default function Rock3DPreview({ params, seed = 42, className = "" }: Roc
     camera: THREE.PerspectiveCamera;
     renderer: THREE.WebGLRenderer;
     controls: OrbitControls;
-    rockMesh: THREE.Mesh | null;
+    rockGroup: THREE.Group;
     animFrame: number;
     clock: THREE.Clock;
   } | null>(null);
@@ -27,161 +125,64 @@ export default function Rock3DPreview({ params, seed = 42, className = "" }: Roc
   paramsRef.current = params;
   seedRef.current = seed;
 
-  const { viewportSettings } = useProVegLayout();
+  const { viewportSettings, savedRocks, sceneRocks } = useProVegLayout();
   const viewportRef = useRef(viewportSettings);
   viewportRef.current = viewportSettings;
+  const savedRocksRef = useRef(savedRocks);
+  const sceneRocksRef = useRef(sceneRocks);
+  savedRocksRef.current = savedRocks;
+  sceneRocksRef.current = sceneRocks;
 
   const buildRock = useCallback(() => {
     const ctx = sceneRef.current;
     if (!ctx) return;
 
-    if (ctx.rockMesh) {
-      ctx.scene.remove(ctx.rockMesh);
-      ctx.rockMesh.geometry.dispose();
-      if (ctx.rockMesh.material instanceof THREE.Material) ctx.rockMesh.material.dispose();
+    // Clear existing
+    while (ctx.rockGroup.children.length) {
+      const child = ctx.rockGroup.children[0] as THREE.Mesh;
+      ctx.rockGroup.remove(child);
+      child.geometry.dispose();
+      if (child.material instanceof THREE.Material) child.material.dispose();
     }
 
-    const geo = generateRockGeometry(paramsRef.current, seedRef.current);
+    const p = paramsRef.current;
+    const csgEnabled = (p.csgEnabled as boolean) && sceneRocksRef.current.length > 0;
 
-    const bufGeo = new THREE.BufferGeometry();
-    bufGeo.setAttribute("position", new THREE.Float32BufferAttribute(geo.positions, 3));
-    bufGeo.setAttribute("normal", new THREE.Float32BufferAttribute(geo.normals, 3));
-    bufGeo.setAttribute("color", new THREE.Float32BufferAttribute(geo.colors, 3));
-    bufGeo.setAttribute("uv", new THREE.Float32BufferAttribute(geo.uvs, 2));
-    bufGeo.setAttribute("tangent", new THREE.Float32BufferAttribute(geo.tangents, 4));
-    // Per-vertex roughness/metalness as custom attributes
-    bufGeo.setAttribute("aRoughness", new THREE.Float32BufferAttribute(geo.roughnessMap, 1));
-    bufGeo.setAttribute("aMetalness", new THREE.Float32BufferAttribute(geo.metalnessMap, 1));
-    bufGeo.setIndex(geo.indices);
+    if (csgEnabled && sceneRocksRef.current.length > 0) {
+      // Multi-rock CSG scene
+      const rockGeos = sceneRocksRef.current.map(sr => {
+        const saved = savedRocksRef.current.find(r => r.id === sr.savedRockId);
+        if (!saved) return null;
+        const geo = generateRockGeometry(saved.params, saved.seed);
+        return { geometry: geo, offset: sr.position as [number,number,number] };
+      }).filter(Boolean) as { geometry: ReturnType<typeof generateRockGeometry>; offset: [number,number,number] }[];
 
-    const roughness = (paramsRef.current.roughness as number) ?? 0.88;
-    const metalness = (paramsRef.current.metalness as number) ?? 0.02;
-    const bumpScale = (paramsRef.current.surfaceBumpScale as number) ?? 0.04;
-    const wireframe = (paramsRef.current.wireframe as boolean) ?? false;
-    const flatShading = (paramsRef.current.flatShading as boolean) ?? false;
+      if (rockGeos.length > 0) {
+        const merged = mergeRockGeometries(rockGeos, p);
+        const mesh = buildMeshFromGeo(merged, p);
+        ctx.rockGroup.add(mesh);
+      }
+    } else if (sceneRocksRef.current.length > 0 && !csgEnabled) {
+      // Render scene rocks individually
+      for (const sr of sceneRocksRef.current) {
+        const saved = savedRocksRef.current.find(r => r.id === sr.savedRockId);
+        if (!saved) continue;
+        const geo = generateRockGeometry(saved.params, saved.seed);
+        const mesh = buildMeshFromGeo(geo, saved.params);
+        mesh.position.set(...sr.position);
+        mesh.rotation.set(...sr.rotation);
+        mesh.scale.setScalar(sr.scale);
+        ctx.rockGroup.add(mesh);
+      }
+    }
 
-    const mat = new THREE.MeshStandardMaterial({
-      vertexColors: true,
-      roughness,
-      metalness,
-      side: THREE.FrontSide,
-      flatShading,
-      wireframe,
-    });
-
-    // Inject procedural normal/roughness using WORLD position (not view position)
-    mat.onBeforeCompile = (shader) => {
-      shader.uniforms.uBumpScale = { value: bumpScale };
-
-      // Add world position varying to vertex shader
-      shader.vertexShader = shader.vertexShader.replace(
-        "#include <common>",
-        `#include <common>
-        varying vec3 vWorldPos;
-        attribute float aRoughness;
-        attribute float aMetalness;
-        varying float vVertRoughness;
-        varying float vVertMetalness;`
-      );
-      shader.vertexShader = shader.vertexShader.replace(
-        "#include <worldpos_vertex>",
-        `#include <worldpos_vertex>
-        vWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
-        vVertRoughness = aRoughness;
-        vVertMetalness = aMetalness;`
-      );
-
-      // Fragment shader: use world pos for stable texturing
-      shader.fragmentShader = shader.fragmentShader.replace(
-        "#include <common>",
-        `#include <common>
-        varying vec3 vWorldPos;
-        varying float vVertRoughness;
-        varying float vVertMetalness;
-        uniform float uBumpScale;
-
-        float rockHash(vec3 p) {
-          float n = sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453;
-          return fract(n);
-        }
-
-        float rockNoise3(vec3 p) {
-          vec3 i = floor(p);
-          vec3 f = fract(p);
-          vec3 u = f * f * (3.0 - 2.0 * f);
-          float n000 = rockHash(i);
-          float n100 = rockHash(i + vec3(1,0,0));
-          float n010 = rockHash(i + vec3(0,1,0));
-          float n110 = rockHash(i + vec3(1,1,0));
-          float n001 = rockHash(i + vec3(0,0,1));
-          float n101 = rockHash(i + vec3(1,0,1));
-          float n011 = rockHash(i + vec3(0,1,1));
-          float n111 = rockHash(i + vec3(1,1,1));
-          float x0 = mix(n000, n100, u.x);
-          float x1 = mix(n010, n110, u.x);
-          float x2 = mix(n001, n101, u.x);
-          float x3 = mix(n011, n111, u.x);
-          return mix(mix(x0, x1, u.y), mix(x2, x3, u.y), u.z);
-        }
-
-        float rockFbm(vec3 p, int oct) {
-          float v = 0.0; float a = 0.5; float f = 1.0;
-          for (int i = 0; i < 6; i++) {
-            if (i >= oct) break;
-            v += a * rockNoise3(p * f);
-            f *= 2.1; a *= 0.48;
-          }
-          return v;
-        }
-        `
-      );
-
-      // Perturb normal using WORLD position — stable on camera move
-      shader.fragmentShader = shader.fragmentShader.replace(
-        "#include <normal_fragment_maps>",
-        `#include <normal_fragment_maps>
-        {
-          vec3 wp = vWorldPos;
-          float eps = 0.015;
-          float center = rockFbm(wp * 8.0, 5);
-          float dx = rockFbm((wp + vec3(eps, 0.0, 0.0)) * 8.0, 5) - center;
-          float dy = rockFbm((wp + vec3(0.0, eps, 0.0)) * 8.0, 5) - center;
-          float dz = rockFbm((wp + vec3(0.0, 0.0, eps)) * 8.0, 5) - center;
-          vec3 bumpNormal = normalize(normal + vec3(dx, dy, dz) * uBumpScale * 20.0);
-          normal = bumpNormal;
-        }
-        `
-      );
-
-      // Use per-vertex roughness & metalness
-      shader.fragmentShader = shader.fragmentShader.replace(
-        "#include <roughnessmap_fragment>",
-        `#include <roughnessmap_fragment>
-        {
-          vec3 wp = vWorldPos;
-          float rNoise = rockFbm(wp * 12.0, 3);
-          roughnessFactor = clamp(vVertRoughness + (rNoise - 0.5) * 0.15, 0.0, 1.0);
-        }
-        `
-      );
-
-      shader.fragmentShader = shader.fragmentShader.replace(
-        "#include <metalnessmap_fragment>",
-        `#include <metalnessmap_fragment>
-        {
-          metalnessFactor = vVertMetalness;
-        }
-        `
-      );
-    };
-
-    ctx.rockMesh = new THREE.Mesh(bufGeo, mat);
-    ctx.rockMesh.castShadow = true;
-    ctx.rockMesh.receiveShadow = true;
-    ctx.scene.add(ctx.rockMesh);
+    // Always render the current "editor" rock
+    const mainGeo = generateRockGeometry(p, seedRef.current);
+    const mainMesh = buildMeshFromGeo(mainGeo, p);
+    ctx.rockGroup.add(mainMesh);
 
     // Fit camera
-    const scale = (paramsRef.current.scale as number) || 1.5;
+    const scale = (p.scale as number) || 1.5;
     const dist = scale * 3;
     ctx.controls.target.set(0, scale * 0.3, 0);
     ctx.camera.position.set(dist * 0.8, dist * 0.5, dist);
@@ -227,7 +228,6 @@ export default function Rock3DPreview({ params, seed = 42, className = "" }: Roc
     // Lights
     const ambient = new THREE.AmbientLight(viewportRef.current.ambientLightColor, viewportRef.current.ambientLightIntensity);
     scene.add(ambient);
-
     const mainLight = new THREE.DirectionalLight(viewportRef.current.mainLightColor, viewportRef.current.mainLightIntensity);
     mainLight.position.set(...viewportRef.current.mainLightPosition);
     mainLight.castShadow = true;
@@ -240,11 +240,9 @@ export default function Rock3DPreview({ params, seed = 42, className = "" }: Roc
     mainLight.shadow.camera.bottom = -5;
     mainLight.shadow.bias = -0.001;
     scene.add(mainLight);
-
     const fillLight = new THREE.DirectionalLight(viewportRef.current.fillLightColor, viewportRef.current.fillLightIntensity);
     fillLight.position.set(...viewportRef.current.fillLightPosition);
     scene.add(fillLight);
-
     const hemi = new THREE.HemisphereLight(viewportRef.current.hemiSkyColor, viewportRef.current.hemiGroundColor, viewportRef.current.hemiIntensity);
     scene.add(hemi);
 
@@ -256,18 +254,16 @@ export default function Rock3DPreview({ params, seed = 42, className = "" }: Roc
     ground.position.y = -0.01;
     ground.receiveShadow = true;
     scene.add(ground);
-
     const grid = new THREE.GridHelper(30, 30, 0x2a2a2e, 0x151518);
     (grid.material as THREE.Material).opacity = 0.25;
     (grid.material as THREE.Material).transparent = true;
     scene.add(grid);
 
-    const clock = new THREE.Clock();
+    const rockGroup = new THREE.Group();
+    scene.add(rockGroup);
 
-    sceneRef.current = {
-      scene, camera, renderer, controls,
-      rockMesh: null, animFrame: 0, clock,
-    };
+    const clock = new THREE.Clock();
+    sceneRef.current = { scene, camera, renderer, controls, rockGroup, animFrame: 0, clock };
 
     buildRock();
 
@@ -300,9 +296,11 @@ export default function Rock3DPreview({ params, seed = 42, className = "" }: Roc
         cancelAnimationFrame(ctx.animFrame);
         ctx.renderer.dispose();
         ctx.controls.dispose();
-        if (ctx.rockMesh) {
-          ctx.rockMesh.geometry.dispose();
-          if (ctx.rockMesh.material instanceof THREE.Material) ctx.rockMesh.material.dispose();
+        while (ctx.rockGroup.children.length) {
+          const child = ctx.rockGroup.children[0] as THREE.Mesh;
+          ctx.rockGroup.remove(child);
+          child.geometry.dispose();
+          if (child.material instanceof THREE.Material) child.material.dispose();
         }
         container.removeChild(ctx.renderer.domElement);
       }
@@ -310,7 +308,7 @@ export default function Rock3DPreview({ params, seed = 42, className = "" }: Roc
     };
   }, []);
 
-  useEffect(() => { buildRock(); }, [params, seed, buildRock]);
+  useEffect(() => { buildRock(); }, [params, seed, savedRocks, sceneRocks, buildRock]);
 
   useEffect(() => {
     const ctx = sceneRef.current;
@@ -322,12 +320,14 @@ export default function Rock3DPreview({ params, seed = 42, className = "" }: Roc
 
   const showNormals = (params.showNormals as boolean) ?? false;
   const showUVs = (params.showUVs as boolean) ?? false;
+  const csgEnabled = (params.csgEnabled as boolean) ?? false;
 
   return (
     <div ref={containerRef} className={`relative ${className}`} style={{ position: "absolute", inset: 0 }}>
       <div className="absolute top-3 left-3 flex flex-col gap-1 pointer-events-none z-10">
         <span className="text-[10px] font-mono text-editor-text-dim">Seed: {seed}</span>
         <span className="text-[10px] font-mono text-editor-text-dim">Rock Editor</span>
+        {csgEnabled && <span className="text-[10px] font-mono text-emerald-400">CSG Merge Active</span>}
         {showNormals && <span className="text-[10px] font-mono text-amber-400">Normal Debug</span>}
         {showUVs && <span className="text-[10px] font-mono text-cyan-400">UV Debug</span>}
       </div>

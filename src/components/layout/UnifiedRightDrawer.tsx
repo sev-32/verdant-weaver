@@ -12,6 +12,9 @@ import { RockShapePanel } from "@/components/panels/rock/RockShapePanel";
 import { RockDisplacementPanel } from "@/components/panels/rock/RockDisplacementPanel";
 import { RockErosionPanel } from "@/components/panels/rock/RockErosionPanel";
 import { RockMaterialPanel } from "@/components/panels/rock/RockMaterialPanel";
+import { RockWeatheringPanel } from "@/components/panels/rock/RockWeatheringPanel";
+import { RockGrowthPanel } from "@/components/panels/rock/RockGrowthPanel";
+import { RockCSGPanel } from "@/components/panels/rock/RockCSGPanel";
 import { RockDeveloperPanel } from "@/components/panels/rock/RockDeveloperPanel";
 import { RockScenePanel } from "@/components/panels/rock/RockScenePanel";
 import { X } from "lucide-react";
@@ -62,6 +65,9 @@ export function UnifiedRightDrawer() {
           {rightPanel === "rock-displacement" && <RockDisplacementPanel />}
           {rightPanel === "rock-erosion" && <RockErosionPanel />}
           {rightPanel === "rock-material" && <RockMaterialPanel />}
+          {rightPanel === "rock-weathering" && <RockWeatheringPanel />}
+          {rightPanel === "rock-growth" && <RockGrowthPanel />}
+          {rightPanel === "rock-csg" && <RockCSGPanel />}
           {rightPanel === "rock-scene" && <RockScenePanel />}
           {rightPanel === "rock-developer" && <RockDeveloperPanel />}
         </div>
