@@ -76,28 +76,13 @@ export const RIGHT_PANELS: RightPanelConfig[] = [
 
 // Rock editor panels
 export const ROCK_RIGHT_PANELS: RightPanelConfig[] = [
-  {
-    id: "rock-shape", label: "Shape", icon: "Hexagon",
-    subTabs: [],
-  },
-  {
-    id: "rock-displacement", label: "Displacement", icon: "Mountain",
-    subTabs: [],
-  },
-  {
-    id: "rock-erosion", label: "Erosion & Fracture", icon: "Droplets",
-    subTabs: [],
-  },
-  {
-    id: "rock-material", label: "Material", icon: "Paintbrush",
-    subTabs: [],
-  },
-  {
-    id: "rock-scene", label: "Scene", icon: "Layers",
-    subTabs: [],
-  },
-  {
-    id: "rock-developer", label: "Developer", icon: "Settings",
-    subTabs: [],
-  },
+  { id: "rock-shape", label: "Shape", icon: "Hexagon", subTabs: [] },
+  { id: "rock-displacement", label: "Displacement", icon: "Mountain", subTabs: [] },
+  { id: "rock-erosion", label: "Erosion & Fracture", icon: "Droplets", subTabs: [] },
+  { id: "rock-material", label: "Material", icon: "Paintbrush", subTabs: [] },
+  { id: "rock-weathering", label: "Weathering", icon: "Thermometer", subTabs: [] },
+  { id: "rock-growth", label: "Growth", icon: "Sprout", subTabs: [] },
+  { id: "rock-csg", label: "CSG Merge", icon: "Combine", subTabs: [] },
+  { id: "rock-scene", label: "Scene", icon: "Layers", subTabs: [] },
+  { id: "rock-developer", label: "Developer", icon: "Settings", subTabs: [] },
 ];

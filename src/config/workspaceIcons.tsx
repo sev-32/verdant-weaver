@@ -3,7 +3,8 @@ import {
   Mountain, Wind, Grid3X3, Circle, CircleDot, Move, Merge,
   AlertTriangle, Layers, Minus, Palette, Box, Sprout, Eye,
   Target, PanelLeftClose, PanelRightClose, Gem, Droplets,
-  Paintbrush, Hexagon, Settings, type LucideIcon,
+  Paintbrush, Hexagon, Settings, Thermometer, Combine,
+  type LucideIcon,
 } from "lucide-react";
 
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -11,7 +12,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Mountain, Wind, Grid3X3, Circle, CircleDot, Move, Merge,
   AlertTriangle, Layers, Minus, Palette, Box, Sprout, Eye,
   Target, PanelLeftClose, PanelRightClose, Gem, Droplets,
-  Paintbrush, Hexagon, Settings,
+  Paintbrush, Hexagon, Settings, Thermometer, Combine,
   Root: Sprout,
   Network: GitBranch,
 };
