@@ -4,8 +4,9 @@ import { useProVegLayout } from "@/contexts/ProVegLayoutContext";
 export function RockGrowthPanel() {
   const { rockParams, setRockParam } = useProVegLayout();
 
-  const mossTypes = ["clump", "sheet", "drape", "stringy", "cushion", "feather"];
-  const lichenTypes = ["crustose", "foliose", "fruticose", "map"];
+  const mossTypes = ["clump", "sheet", "drape", "stringy", "cushion", "feather", "sphagnum", "haircap", "peat"];
+  const lichenTypes = ["crustose", "foliose", "fruticose", "map", "powdery", "areolate", "bullate", "umbilicate"];
+  const algaeTypes = ["green", "red", "brown", "blue-green", "diatom"];
 
   return (
     <div className="space-y-3">
@@ -32,11 +33,17 @@ export function RockGrowthPanel() {
         <SliderRow label="Moisture" value={rockParams.mossMoisture as number} min={0} max={1} step={0.01} keyPrimary="rock:mossMoisture" />
         <SliderRow label="Age" value={rockParams.mossAge as number} min={0} max={1} step={0.01} keyPrimary="rock:mossAge" />
         <SliderRow label="Spore Spread" value={rockParams.mossSporeSpread as number} min={0} max={1} step={0.01} keyPrimary="rock:mossSporeSpread" />
+        <SliderRow label="Fruiting Bodies" value={rockParams.mossFruitingBodies as number} min={0} max={1} step={0.01} keyPrimary="rock:mossFruitingBodies" />
+        <SliderRow label="Dead Patches" value={rockParams.mossDeadPatches as number} min={0} max={1} step={0.01} keyPrimary="rock:mossDeadPatches" />
+        <SliderRow label="Blending" value={rockParams.mossBlending as number} min={0} max={1} step={0.01} keyPrimary="rock:mossBlending" />
+        <SliderRow label="Overgrowth" value={rockParams.mossOvergrowth as number} min={0} max={1} step={0.01} keyPrimary="rock:mossOvergrowth" />
         <div className="flex items-center gap-2 mt-1">
           <span className="text-[11px] text-muted-foreground">Primary</span>
           <input type="color" value={rockParams.mossColor as string} onChange={(e) => setRockParam("mossColor", e.target.value)} className="w-6 h-6 rounded border border-border cursor-pointer bg-transparent" />
           <span className="text-[11px] text-muted-foreground">Secondary</span>
           <input type="color" value={rockParams.mossSecondaryColor as string} onChange={(e) => setRockParam("mossSecondaryColor", e.target.value)} className="w-6 h-6 rounded border border-border cursor-pointer bg-transparent" />
+          <span className="text-[11px] text-muted-foreground">Dead</span>
+          <input type="color" value={rockParams.mossDeadColor as string} onChange={(e) => setRockParam("mossDeadColor", e.target.value)} className="w-6 h-6 rounded border border-border cursor-pointer bg-transparent" />
         </div>
       </div>
 
@@ -60,17 +67,31 @@ export function RockGrowthPanel() {
         <SliderRow label="Age" value={rockParams.lichenAge as number} min={0} max={1} step={0.01} keyPrimary="rock:lichenAge" />
         <SliderRow label="Elevation Pref" value={rockParams.lichenElevation as number} min={0} max={1} step={0.01} keyPrimary="rock:lichenElevation" />
         <SliderRow label="Exposed Pref" value={rockParams.lichenPreferExposed as number} min={0} max={1} step={0.01} keyPrimary="rock:lichenPreferExposed" />
+        <SliderRow label="Soredia" value={rockParams.lichenSoredia as number} min={0} max={1} step={0.01} keyPrimary="rock:lichenSoredia" />
+        <SliderRow label="Apothecia" value={rockParams.lichenApothecia as number} min={0} max={1} step={0.01} keyPrimary="rock:lichenApothecia" />
+        <SliderRow label="Multi-Species" value={rockParams.lichenMultiSpecies as number} min={0} max={1} step={0.01} keyPrimary="rock:lichenMultiSpecies" />
+        <SliderRow label="Competition" value={rockParams.lichenCompetition as number} min={0} max={1} step={0.01} keyPrimary="rock:lichenCompetition" />
         <div className="flex items-center gap-2 mt-1">
           <span className="text-[11px] text-muted-foreground">Color</span>
           <input type="color" value={rockParams.lichenColor as string} onChange={(e) => setRockParam("lichenColor", e.target.value)} className="w-6 h-6 rounded border border-border cursor-pointer bg-transparent" />
           <span className="text-[11px] text-muted-foreground">Edge</span>
           <input type="color" value={rockParams.lichenEdgeColor as string} onChange={(e) => setRockParam("lichenEdgeColor", e.target.value)} className="w-6 h-6 rounded border border-border cursor-pointer bg-transparent" />
+          <span className="text-[11px] text-muted-foreground">Sp.2</span>
+          <input type="color" value={rockParams.lichenSpecies2Color as string} onChange={(e) => setRockParam("lichenSpecies2Color", e.target.value)} className="w-6 h-6 rounded border border-border cursor-pointer bg-transparent" />
         </div>
       </div>
 
       {/* Algae */}
       <div className="editor-section">
         <div className="editor-section-title">Algae</div>
+        <div className="flex items-center gap-1 mb-1.5 flex-wrap">
+          {algaeTypes.map((t) => (
+            <button key={t} onClick={() => setRockParam("algaeType", t)}
+              className={`px-2 py-0.5 rounded text-[9px] transition-colors ${rockParams.algaeType === t ? "bg-primary/20 text-primary" : "bg-muted/30 text-muted-foreground hover:text-foreground"}`}>
+              {t}
+            </button>
+          ))}
+        </div>
         <SliderRow label="Strength" value={rockParams.algaeStrength as number} min={0} max={1} step={0.01} keyPrimary="rock:algaeStrength" />
         <div className="flex items-center gap-2">
           <span className="text-[11px] text-muted-foreground">Color</span>
@@ -80,6 +101,8 @@ export function RockGrowthPanel() {
         <SliderRow label="Wetness" value={rockParams.algaeWetness as number} min={0} max={1} step={0.01} keyPrimary="rock:algaeWetness" />
         <SliderRow label="Threshold" value={rockParams.algaeThreshold as number} min={0} max={1} step={0.01} keyPrimary="rock:algaeThreshold" />
         <SliderRow label="Sliminess" value={rockParams.algaeSliminess as number} min={0} max={1} step={0.01} keyPrimary="rock:algaeSliminess" />
+        <SliderRow label="Biofilm" value={rockParams.algaeBiofilm as number} min={0} max={1} step={0.01} keyPrimary="rock:algaeBiofilm" />
+        <SliderRow label="Streaks" value={rockParams.algaeStreaks as number} min={0} max={1} step={0.01} keyPrimary="rock:algaeStreaks" />
       </div>
 
       {/* Snow / Ice / Frost */}
@@ -94,41 +117,32 @@ export function RockGrowthPanel() {
         <SliderRow label="Sharpness" value={rockParams.snowSharpness as number} min={0} max={1} step={0.01} keyPrimary="rock:snowSharpness" />
         <SliderRow label="Drift" value={rockParams.snowDrift as number} min={0} max={1} step={0.01} keyPrimary="rock:snowDrift" />
         <SliderRow label="Drift Direction" value={rockParams.snowDriftDirection as number} min={-1} max={1} step={0.01} keyPrimary="rock:snowDriftDirection" />
+        <SliderRow label="Melt" value={rockParams.snowMelt as number} min={0} max={1} step={0.01} keyPrimary="rock:snowMelt" />
+        <SliderRow label="Melt Drip" value={rockParams.snowMeltDrip as number} min={0} max={1} step={0.01} keyPrimary="rock:snowMeltDrip" />
+        <SliderRow label="Dirty Snow" value={rockParams.snowDirty as number} min={0} max={1} step={0.01} keyPrimary="rock:snowDirty" />
+        <SliderRow label="Icicles" value={rockParams.snowIcicles as number} min={0} max={1} step={0.01} keyPrimary="rock:snowIcicles" />
       </div>
 
       <div className="editor-section">
-        <div className="editor-section-title">Ice</div>
-        <SliderRow label="Strength" value={rockParams.iceStrength as number} min={0} max={1} step={0.01} keyPrimary="rock:iceStrength" />
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] text-muted-foreground">Color</span>
-          <input type="color" value={rockParams.iceColor as string} onChange={(e) => setRockParam("iceColor", e.target.value)} className="w-6 h-6 rounded border border-border cursor-pointer bg-transparent" />
-        </div>
+        <div className="editor-section-title">Ice & Frost</div>
+        <SliderRow label="Ice" value={rockParams.iceStrength as number} min={0} max={1} step={0.01} keyPrimary="rock:iceStrength" />
         <SliderRow label="Thickness" value={rockParams.iceThickness as number} min={0} max={1} step={0.01} keyPrimary="rock:iceThickness" />
         <SliderRow label="Translucency" value={rockParams.iceTranslucency as number} min={0} max={1} step={0.01} keyPrimary="rock:iceTranslucency" />
+        <SliderRow label="Ice Cracking" value={rockParams.iceCracking as number} min={0} max={1} step={0.01} keyPrimary="rock:iceCracking" />
+        <SliderRow label="Ice Bubbles" value={rockParams.iceBubbles as number} min={0} max={1} step={0.01} keyPrimary="rock:iceBubbles" />
+        <SliderRow label="Frost" value={rockParams.frostStrength as number} min={0} max={1} step={0.01} keyPrimary="rock:frostStrength" />
+        <SliderRow label="Frost Scale" value={rockParams.frostScale as number} min={2} max={20} step={1} keyPrimary="rock:frostScale" format={(v) => v.toString()} />
+        <SliderRow label="Frost Thickness" value={rockParams.frostThickness as number} min={0} max={1} step={0.01} keyPrimary="rock:frostThickness" />
       </div>
 
+      {/* Environment */}
       <div className="editor-section">
-        <div className="editor-section-title">Frost</div>
-        <SliderRow label="Strength" value={rockParams.frostStrength as number} min={0} max={1} step={0.01} keyPrimary="rock:frostStrength" />
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] text-muted-foreground">Color</span>
-          <input type="color" value={rockParams.frostColor as string} onChange={(e) => setRockParam("frostColor", e.target.value)} className="w-6 h-6 rounded border border-border cursor-pointer bg-transparent" />
-        </div>
-        <SliderRow label="Scale" value={rockParams.frostScale as number} min={2} max={20} step={1} keyPrimary="rock:frostScale" format={(v) => v.toString()} />
-      </div>
-
-      {/* Dust / Sediment / Ash */}
-      <div className="editor-section">
-        <div className="editor-section-title">Dust / Sediment</div>
-        <SliderRow label="Dust" value={rockParams.dustStrength as number} min={0} max={1} step={0.01} keyPrimary="rock:dustStrength" />
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] text-muted-foreground">Color</span>
-          <input type="color" value={rockParams.dustColor as string} onChange={(e) => setRockParam("dustColor", e.target.value)} className="w-6 h-6 rounded border border-border cursor-pointer bg-transparent" />
-        </div>
-        <SliderRow label="Gravity" value={rockParams.dustGravity as number} min={0} max={1} step={0.01} keyPrimary="rock:dustGravity" />
-        <SliderRow label="Thickness" value={rockParams.dustThickness as number} min={0} max={1} step={0.01} keyPrimary="rock:dustThickness" />
-        <SliderRow label="Sediment" value={rockParams.sedimentStrength as number} min={0} max={1} step={0.01} keyPrimary="rock:sedimentStrength" />
-        <SliderRow label="Ash" value={rockParams.ashStrength as number} min={0} max={1} step={0.01} keyPrimary="rock:ashStrength" />
+        <div className="editor-section-title">Environment</div>
+        <SliderRow label="Ground Moss" value={rockParams.groundMossCoverage as number} min={0} max={1} step={0.01} keyPrimary="rock:groundMossCoverage" />
+        <SliderRow label="Buried Depth" value={rockParams.buriedDepth as number} min={0} max={1} step={0.01} keyPrimary="rock:buriedDepth" />
+        <SliderRow label="Soil Line" value={rockParams.soilLine as number} min={0} max={1} step={0.01} keyPrimary="rock:soilLine" />
+        <SliderRow label="Soil Splash" value={rockParams.soilSplash as number} min={0} max={1} step={0.01} keyPrimary="rock:soilSplash" />
+        <SliderRow label="Root Exposure" value={rockParams.rootExposure as number} min={0} max={1} step={0.01} keyPrimary="rock:rootExposure" />
       </div>
     </div>
   );

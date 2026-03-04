@@ -5,7 +5,7 @@ export function RockWeatheringPanel() {
   const { rockParams, setRockParam } = useProVegLayout();
   return (
     <div className="space-y-3">
-      {/* Thermal Erosion */}
+      {/* Thermal */}
       <div className="editor-section">
         <div className="editor-section-title">Thermal Erosion (Freeze-Thaw)</div>
         <SliderRow label="Strength" value={rockParams.thermalErosionStrength as number} min={0} max={1} step={0.01} keyPrimary="rock:thermalErosionStrength" />
@@ -15,7 +15,7 @@ export function RockWeatheringPanel() {
         <SliderRow label="Direction Bias" value={rockParams.thermalCrackDirection as number} min={0} max={1} step={0.01} keyPrimary="rock:thermalCrackDirection" />
       </div>
 
-      {/* Chemical Weathering */}
+      {/* Chemical */}
       <div className="editor-section">
         <div className="editor-section-title">Chemical Weathering</div>
         <SliderRow label="Strength" value={rockParams.chemicalWeatheringStrength as number} min={0} max={1} step={0.01} keyPrimary="rock:chemicalWeatheringStrength" />
@@ -25,7 +25,7 @@ export function RockWeatheringPanel() {
         <SliderRow label="Pitting Scale" value={rockParams.chemicalPittingScale as number} min={1} max={15} step={0.5} keyPrimary="rock:chemicalPittingScale" />
       </div>
 
-      {/* Iron Oxide / Rust */}
+      {/* Iron Oxide */}
       <div className="editor-section">
         <div className="editor-section-title">Iron Oxide / Rust</div>
         <SliderRow label="Strength" value={rockParams.rustStrength as number} min={0} max={1} step={0.01} keyPrimary="rock:rustStrength" />
@@ -38,6 +38,9 @@ export function RockWeatheringPanel() {
         <SliderRow label="Drip Streaks" value={rockParams.rustDrip as number} min={0} max={1} step={0.01} keyPrimary="rock:rustDrip" />
         <SliderRow label="Drip Length" value={rockParams.rustDripLength as number} min={0.1} max={2} step={0.05} keyPrimary="rock:rustDripLength" />
         <SliderRow label="Oxidation" value={rockParams.rustOxidation as number} min={0} max={1} step={0.01} keyPrimary="rock:rustOxidation" />
+        <SliderRow label="Bleed" value={rockParams.rustBleed as number} min={0} max={1} step={0.01} keyPrimary="rock:rustBleed" />
+        <SliderRow label="Manganese" value={rockParams.rustManganese as number} min={0} max={1} step={0.01} keyPrimary="rock:rustManganese" />
+        <SliderRow label="Desert Varnish" value={rockParams.rustDesertVarnish as number} min={0} max={1} step={0.01} keyPrimary="rock:rustDesertVarnish" />
       </div>
 
       {/* Patina */}
@@ -50,7 +53,7 @@ export function RockWeatheringPanel() {
         </div>
       </div>
 
-      {/* Water Staining */}
+      {/* Water */}
       <div className="editor-section">
         <div className="editor-section-title">Water Staining</div>
         <SliderRow label="Strength" value={rockParams.waterStainStrength as number} min={0} max={1} step={0.01} keyPrimary="rock:waterStainStrength" />
@@ -61,6 +64,9 @@ export function RockWeatheringPanel() {
         <SliderRow label="Height" value={rockParams.waterStainHeight as number} min={0} max={1} step={0.01} keyPrimary="rock:waterStainHeight" />
         <SliderRow label="Sharpness" value={rockParams.waterStainSharpness as number} min={0} max={1} step={0.01} keyPrimary="rock:waterStainSharpness" />
         <SliderRow label="Drip Lines" value={rockParams.waterStainDrip as number} min={0} max={1} step={0.01} keyPrimary="rock:waterStainDrip" />
+        <SliderRow label="Flow Channel" value={rockParams.waterFlowChannel as number} min={0} max={1} step={0.01} keyPrimary="rock:waterFlowChannel" />
+        <SliderRow label="Splash" value={rockParams.waterSplash as number} min={0} max={1} step={0.01} keyPrimary="rock:waterSplash" />
+        <SliderRow label="Pooling" value={rockParams.waterPooling as number} min={0} max={1} step={0.01} keyPrimary="rock:waterPooling" />
       </div>
 
       {/* Wet Areas */}
@@ -80,12 +86,15 @@ export function RockWeatheringPanel() {
         <SliderRow label="Darkening" value={rockParams.ageDarkening as number} min={0} max={1} step={0.01} keyPrimary="rock:ageDarkening" />
         <SliderRow label="Color Shift" value={rockParams.ageColorShift as number} min={-1} max={1} step={0.01} keyPrimary="rock:ageColorShift" />
         <SliderRow label="Surface Wear" value={rockParams.ageWear as number} min={0} max={1} step={0.01} keyPrimary="rock:ageWear" />
+        <SliderRow label="Edge Wear" value={rockParams.ageWearEdges as number} min={0} max={1} step={0.01} keyPrimary="rock:ageWearEdges" />
+        <SliderRow label="Staining" value={rockParams.ageStaining as number} min={0} max={1} step={0.01} keyPrimary="rock:ageStaining" />
+        <SliderRow label="Mineral Deposit" value={rockParams.ageMineralDeposit as number} min={0} max={1} step={0.01} keyPrimary="rock:ageMineralDeposit" />
       </div>
 
       {/* Salt Crust */}
       <div className="editor-section">
         <div className="editor-section-title">Salt / Mineral Crust</div>
-        <SliderRow label="Strength" value={rockParams.saltCrustStrength as number} min={0} max={1} step={0.01} keyPrimary="rock:saltCrustStrength" />
+        <SliderRow label="Salt Crust" value={rockParams.saltCrustStrength as number} min={0} max={1} step={0.01} keyPrimary="rock:saltCrustStrength" />
         <div className="flex items-center gap-2">
           <span className="text-[11px] text-muted-foreground">Color</span>
           <input type="color" value={rockParams.saltCrustColor as string} onChange={(e) => setRockParam("saltCrustColor", e.target.value)} className="w-6 h-6 rounded border border-border cursor-pointer bg-transparent" />
@@ -93,6 +102,28 @@ export function RockWeatheringPanel() {
         <SliderRow label="Scale" value={rockParams.saltCrustScale as number} min={1} max={15} step={0.5} keyPrimary="rock:saltCrustScale" />
         <SliderRow label="Threshold" value={rockParams.saltCrustThreshold as number} min={0.2} max={0.9} step={0.01} keyPrimary="rock:saltCrustThreshold" />
         <SliderRow label="Crystal Formation" value={rockParams.saltCrystals as number} min={0} max={1} step={0.01} keyPrimary="rock:saltCrystals" />
+        <SliderRow label="Calcite Crust" value={rockParams.calciteCrust as number} min={0} max={1} step={0.01} keyPrimary="rock:calciteCrust" />
+        <SliderRow label="Gypsum Rosette" value={rockParams.gypsumRosette as number} min={0} max={1} step={0.01} keyPrimary="rock:gypsumRosette" />
+      </div>
+
+      {/* Dust/Sediment/Mud/Sand */}
+      <div className="editor-section">
+        <div className="editor-section-title">Dust / Sediment / Sand</div>
+        <SliderRow label="Dust" value={rockParams.dustStrength as number} min={0} max={1} step={0.01} keyPrimary="rock:dustStrength" />
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] text-muted-foreground">Color</span>
+          <input type="color" value={rockParams.dustColor as string} onChange={(e) => setRockParam("dustColor", e.target.value)} className="w-6 h-6 rounded border border-border cursor-pointer bg-transparent" />
+        </div>
+        <SliderRow label="Gravity" value={rockParams.dustGravity as number} min={0} max={1} step={0.01} keyPrimary="rock:dustGravity" />
+        <SliderRow label="Thickness" value={rockParams.dustThickness as number} min={0} max={1} step={0.01} keyPrimary="rock:dustThickness" />
+        <SliderRow label="Wind Blown" value={rockParams.dustWindBlown as number} min={0} max={1} step={0.01} keyPrimary="rock:dustWindBlown" />
+        <SliderRow label="Sediment" value={rockParams.sedimentStrength as number} min={0} max={1} step={0.01} keyPrimary="rock:sedimentStrength" />
+        <SliderRow label="Sediment Layering" value={rockParams.sedimentLayering as number} min={0} max={1} step={0.01} keyPrimary="rock:sedimentLayering" />
+        <SliderRow label="Ash" value={rockParams.ashStrength as number} min={0} max={1} step={0.01} keyPrimary="rock:ashStrength" />
+        <SliderRow label="Mud" value={rockParams.mudStrength as number} min={0} max={1} step={0.01} keyPrimary="rock:mudStrength" />
+        <SliderRow label="Mud Cracking" value={rockParams.mudCracking as number} min={0} max={1} step={0.01} keyPrimary="rock:mudCracking" />
+        <SliderRow label="Sand" value={rockParams.sandStrength as number} min={0} max={1} step={0.01} keyPrimary="rock:sandStrength" />
+        <SliderRow label="Sand Ripples" value={rockParams.sandRipples as number} min={0} max={1} step={0.01} keyPrimary="rock:sandRipples" />
       </div>
     </div>
   );

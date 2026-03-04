@@ -174,6 +174,12 @@ export function ProVegLayoutProvider({ children }: { children: React.ReactNode }
         position: [offset, 0, 0],
         rotation: [0, 0, 0],
         scale: 1,
+        scaleXYZ: [1, 1, 1],
+        mirrorX: false,
+        mirrorZ: false,
+        visible: true,
+        locked: false,
+        label: "",
       };
       return { ...s, sceneRocks: [...s.sceneRocks, sr] };
     });
