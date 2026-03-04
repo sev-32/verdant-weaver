@@ -9,11 +9,14 @@ import { BarkRootsPanel } from "@/components/panels/right/BarkRootsPanel";
 import { WindLODPanel } from "@/components/panels/right/WindLODPanel";
 import { SpaceColonizationPanel } from "@/components/panels/right/SpaceColonizationPanel";
 import { RockShapePanel } from "@/components/panels/rock/RockShapePanel";
+import { RockTerrainPanel } from "@/components/panels/rock/RockTerrainPanel";
 import { RockDisplacementPanel } from "@/components/panels/rock/RockDisplacementPanel";
 import { RockErosionPanel } from "@/components/panels/rock/RockErosionPanel";
+import { RockFoliationPanel } from "@/components/panels/rock/RockFoliationPanel";
 import { RockMaterialPanel } from "@/components/panels/rock/RockMaterialPanel";
 import { RockWeatheringPanel } from "@/components/panels/rock/RockWeatheringPanel";
 import { RockGrowthPanel } from "@/components/panels/rock/RockGrowthPanel";
+import { RockBiologyPanel } from "@/components/panels/rock/RockBiologyPanel";
 import { RockCSGPanel } from "@/components/panels/rock/RockCSGPanel";
 import { RockDeveloperPanel } from "@/components/panels/rock/RockDeveloperPanel";
 import { RockScenePanel } from "@/components/panels/rock/RockScenePanel";
@@ -39,13 +42,10 @@ export function UnifiedRightDrawer() {
             const Icon = getIcon(st.icon);
             const active = effectiveSubTab === st.id;
             return (
-              <button
-                key={st.id}
+              <button key={st.id}
                 className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] transition-colors ${active ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-editor-hover"}`}
-                onClick={() => setRightSubTab(st.id)}
-              >
-                <Icon className="h-3 w-3" />
-                {st.label}
+                onClick={() => setRightSubTab(st.id)}>
+                <Icon className="h-3 w-3" />{st.label}
               </button>
             );
           })}
@@ -53,20 +53,21 @@ export function UnifiedRightDrawer() {
       )}
       <ScrollArea className="flex-1">
         <div className="p-3 space-y-3">
-          {/* Tree panels */}
           {rightPanel === "trunk" && <TrunkPanel subTab={effectiveSubTab} />}
           {rightPanel === "branching" && <BranchingPanel subTab={effectiveSubTab} />}
           {rightPanel === "leaves" && <LeavesPanel subTab={effectiveSubTab} />}
           {rightPanel === "bark-roots" && <BarkRootsPanel subTab={effectiveSubTab} />}
           {rightPanel === "wind-lod" && <WindLODPanel subTab={effectiveSubTab} />}
           {rightPanel === "space-colonization" && <SpaceColonizationPanel subTab={effectiveSubTab} />}
-          {/* Rock panels */}
           {rightPanel === "rock-shape" && <RockShapePanel />}
+          {rightPanel === "rock-terrain" && <RockTerrainPanel />}
           {rightPanel === "rock-displacement" && <RockDisplacementPanel />}
           {rightPanel === "rock-erosion" && <RockErosionPanel />}
+          {rightPanel === "rock-foliation" && <RockFoliationPanel />}
           {rightPanel === "rock-material" && <RockMaterialPanel />}
           {rightPanel === "rock-weathering" && <RockWeatheringPanel />}
           {rightPanel === "rock-growth" && <RockGrowthPanel />}
+          {rightPanel === "rock-biology" && <RockBiologyPanel />}
           {rightPanel === "rock-csg" && <RockCSGPanel />}
           {rightPanel === "rock-scene" && <RockScenePanel />}
           {rightPanel === "rock-developer" && <RockDeveloperPanel />}
