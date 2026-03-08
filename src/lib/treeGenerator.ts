@@ -538,21 +538,29 @@ export function generateTreeGeometry(params: TreeParams, seed: number = 1337): T
 
     addTube(p0, p1, p2, p3, radius, r1, order + 1, isDead);
 
-    // Add leaves on this branch if it's near terminal
-    if (!isDead && order >= maxOrder - 1) {
-      // Multiple leaf clusters along the branch
-      const numClusters = order >= maxOrder ? 3 : 2;
-      for (let lp = 0; lp < numClusters; lp++) {
-        const lt = 0.3 + lp * (0.6 / numClusters);
-        addLeafCluster(bezierPoint(p0, p1, p2, p3, lt), dir, order);
+    // Add leaves — even mid-level branches get some foliage
+    if (!isDead) {
+      const isTerminal = order >= maxOrder;
+      const isNearTerminal = order >= maxOrder - 1;
+      const isMid = order >= Math.max(1, maxOrder - 2);
+      
+      if (isTerminal || isNearTerminal || isMid) {
+        // More clusters on terminal branches, fewer on mid-level
+        const numClusters = isTerminal ? 4 : isNearTerminal ? 3 : 1;
+        for (let lp = 0; lp < numClusters; lp++) {
+          const lt = 0.2 + lp * (0.7 / numClusters);
+          addLeafCluster(bezierPoint(p0, p1, p2, p3, lt), dir, order);
+        }
+        // Always a cluster at the tip
+        addLeafCluster(p3, dir, order);
       }
-      addLeafCluster(p3, dir, order);
     }
 
     // Spawn sub-branches
     if (order < maxOrder && !isDead) {
-      const subCount = Math.max(1, Math.round(
-        (3 - order * 0.4) * (0.6 + 0.4 * age01) * healthVigor
+      // More children on lower-order branches for fullness
+      const subCount = Math.max(2, Math.round(
+        (4 - order * 0.6) * (0.5 + 0.5 * age01) * healthVigor
       ));
 
       for (let c = 0; c < subCount; c++) {
