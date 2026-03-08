@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { useProVegLayout } from "@/contexts/ProVegLayoutContext";
 import { generateTreeGeometry } from "@/lib/treeGenerator";
+import { registerRenderer, unregisterRenderer } from "@/hooks/useScreenshotCapture";
 import type { TreeParams } from "@/types/treeParams";
 
 interface Tree3DPreviewProps {
