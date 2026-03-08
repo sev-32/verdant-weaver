@@ -295,6 +295,7 @@ export default function Rock3DPreview({ params, seed = 42, className = "" }: Roc
 
     return () => {
       resizeObserver.disconnect();
+      unregisterRenderer();
       const ctx = sceneRef.current;
       if (ctx) {
         cancelAnimationFrame(ctx.animFrame);

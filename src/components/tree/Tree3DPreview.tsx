@@ -317,6 +317,7 @@ export default function Tree3DPreview({
 
     return () => {
       resizeObserver.disconnect();
+      unregisterRenderer();
       const ctx = sceneRef.current;
       if (ctx) {
         cancelAnimationFrame(ctx.animFrame);
