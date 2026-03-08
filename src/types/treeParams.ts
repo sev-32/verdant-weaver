@@ -110,7 +110,7 @@ export const DEFAULT_TREE_PARAMS: TreeParams = {
   "vegetation.branching.tapering": 0.7, branchTapering: 0.7,
   "vegetation.branching.minBranchRadius": 0.005, minBranchRadius: 0.005,
   "vegetation.branching.spiralAngle": 137.5, spiralAngle: 137.5,
-  "vegetation.branching.firstBranchHeight": 0.25, firstBranchHeight: 0.25,
+  "vegetation.branching.firstBranchHeight": 0.3, firstBranchHeight: 0.3,
 
   // Leaves
   "vegetation.leaves.representation": "CLUSTERS", leafRepresentation: "CLUSTERS",
