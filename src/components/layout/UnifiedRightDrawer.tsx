@@ -8,6 +8,7 @@ import { LeavesPanel } from "@/components/panels/right/LeavesPanel";
 import { BarkRootsPanel } from "@/components/panels/right/BarkRootsPanel";
 import { WindLODPanel } from "@/components/panels/right/WindLODPanel";
 import { SpaceColonizationPanel } from "@/components/panels/right/SpaceColonizationPanel";
+import { CrownPanel } from "@/components/panels/right/CrownPanel";
 import { RockShapePanel } from "@/components/panels/rock/RockShapePanel";
 import { RockTerrainPanel } from "@/components/panels/rock/RockTerrainPanel";
 import { RockDisplacementPanel } from "@/components/panels/rock/RockDisplacementPanel";
@@ -55,6 +56,7 @@ export function UnifiedRightDrawer() {
         <div className="p-3 space-y-3">
           {rightPanel === "trunk" && <TrunkPanel subTab={effectiveSubTab} />}
           {rightPanel === "branching" && <BranchingPanel subTab={effectiveSubTab} />}
+          {rightPanel === "crown" && <CrownPanel subTab={effectiveSubTab} />}
           {rightPanel === "leaves" && <LeavesPanel subTab={effectiveSubTab} />}
           {rightPanel === "bark-roots" && <BarkRootsPanel subTab={effectiveSubTab} />}
           {rightPanel === "wind-lod" && <WindLODPanel subTab={effectiveSubTab} />}
