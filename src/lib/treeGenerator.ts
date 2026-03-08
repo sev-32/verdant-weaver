@@ -429,8 +429,7 @@ export function generateTreeGeometry(params: TreeParams, seed: number = 1337): T
   }
 
   // ========================================
-  // UNIFIED RECURSIVE GROWTH — the trunk IS just order-0, the oldest branch
-  // No separate trunk geometry. One recursive function does everything.
+  // GROW A BRANCH (order > 0) — recursive with sub-branching
   // ========================================
   function growBranch(
     startPos: Vec3,
@@ -443,57 +442,43 @@ export function generateTreeGeometry(params: TreeParams, seed: number = 1337): T
     if (depth > 40 || length < 0.03 || radius < 0.002) return;
     if (order > maxOrder) return;
 
-    const isDead = order > 0 && rng() < deadBranchRatio;
-    const isBroken = order > 0 && rng() < breakProbability;
+    const isDead = rng() < deadBranchRatio;
+    const isBroken = rng() < breakProbability;
 
     let effectiveLength = length;
     if (isBroken) effectiveLength *= (1 - breakSeverity * (0.3 + rng() * 0.7));
 
-    // Physics: gravity sag increases with order, phototropism pulls tips up
-    const droopAmount = order === 0 ? 0 : (branchDroop + droopIncrease * Math.max(0, order - 1));
-    
-    // Direction: trunk (order 0) stays mostly vertical with slight crookedness
-    // Branches get more randomness
-    const wobble = order === 0 ? crookedness * 0.12 : 0.2;
+    const droopAmount = branchDroop + droopIncrease * Math.max(0, order - 1);
+
+    const wobble = 0.15 + branchCurvature * 0.3;
     const dir = v3normalize([
       startDir[0] + (rng() - 0.5) * wobble,
-      startDir[1] - gravityResponse * 0.03 * order + (order > 0 ? phototropism * 0.05 : 0),
+      startDir[1] - gravityResponse * 0.04 * order + phototropism * 0.06,
       startDir[2] + (rng() - 0.5) * wobble,
     ]);
 
     const p0 = startPos;
-    const p3 = v3add(p0, v3scale(dir, effectiveLength));
-    
-    // Build bezier control points with accumulated curvature
-    const curveMag = (order === 0 ? crookedness * 0.3 : branchCurvature) * effectiveLength;
-    const lateralWobble1 = (rng() - 0.5) * curveMag * 1.2;
-    const lateralWobble2 = (rng() - 0.5) * curveMag * 1.5;
-    
+    const curveMag = branchCurvature * effectiveLength;
     const p1: Vec3 = [
-      p0[0] + dir[0] * effectiveLength * 0.33 + lateralWobble1,
+      p0[0] + dir[0] * effectiveLength * 0.33 + (rng() - 0.5) * curveMag,
       p0[1] + dir[1] * effectiveLength * 0.33 - droopAmount * effectiveLength * 0.15,
       p0[2] + dir[2] * effectiveLength * 0.33 + (rng() - 0.5) * curveMag * 0.8,
     ];
     const p2: Vec3 = [
-      p0[0] + dir[0] * effectiveLength * 0.66 + lateralWobble2,
-      p0[1] + dir[1] * effectiveLength * 0.66 
+      p0[0] + dir[0] * effectiveLength * 0.66 + (rng() - 0.5) * curveMag * 1.3,
+      p0[1] + dir[1] * effectiveLength * 0.66
         - droopAmount * effectiveLength * 0.35
         - gravityResponse * effectiveLength * 0.08 * order
-        + (order > 0 ? phototropism * effectiveLength * 0.12 : 0)
-        + (isWillow && order > 0 ? -effectiveLength * 0.15 : 0),
-      p0[2] + dir[2] * effectiveLength * 0.66 + (rng() - 0.5) * curveMag * 1.0,
+        + phototropism * effectiveLength * 0.12
+        + (isWillow ? -effectiveLength * 0.15 : 0),
+      p0[2] + dir[2] * effectiveLength * 0.66 + (rng() - 0.5) * curveMag,
     ];
-    
-    if (order > 0) {
-      p3[1] += phototropism * effectiveLength * 0.08;
-      p3[1] -= gravityResponse * effectiveLength * 0.05 * order;
-      if (isWillow) p3[1] -= effectiveLength * 0.12;
-    }
+    const p3: Vec3 = v3add(p0, v3scale(dir, effectiveLength));
+    p3[1] += phototropism * effectiveLength * 0.08;
+    p3[1] -= gravityResponse * effectiveLength * 0.05 * order;
+    if (isWillow) p3[1] -= effectiveLength * 0.12;
 
-    // End radius: smooth taper. The trunk tapers just like any branch — continuously.
-    const taperFactor = order === 0
-      ? 0.65 + 0.15 * (1 / (depth + 1))  // trunk tapers gently per segment
-      : 0.45 + 0.25 * (1 / (order + 1));  // branches taper more aggressively
+    const taperFactor = 0.45 + 0.25 * (1 / (order + 1));
     const r1 = radius * taperFactor;
 
     if (isBroken) {
@@ -503,12 +488,11 @@ export function generateTreeGeometry(params: TreeParams, seed: number = 1337): T
 
     addTube(p0, p1, p2, p3, radius, r1, order, isDead);
 
-    // Add leaves on mid-to-terminal branches (never on trunk/order 0)
-    if (!isDead && order > 0) {
+    // Leaves on mid-to-terminal branches
+    if (!isDead) {
       const isTerminal = order >= maxOrder;
       const isNearTerminal = order >= maxOrder - 1;
       const isMid = order >= Math.max(2, maxOrder - 2);
-      
       if (isTerminal || isNearTerminal || isMid) {
         const numClusters = isTerminal ? 4 : isNearTerminal ? 3 : 1;
         for (let lp = 0; lp < numClusters; lp++) {
@@ -519,83 +503,40 @@ export function generateTreeGeometry(params: TreeParams, seed: number = 1337): T
       }
     }
 
-    // --- SPAWN CHILD BRANCHES along this segment ---
-    // For order 0 (trunk): these are the main lateral branches
-    // For higher orders: sub-branches
-    if (order <= maxOrder && !isDead) {
-      // How many children to spawn along this segment
-      const childCount = order === 0
-        ? Math.max(2, Math.round(rawBranchCount * 0.35 * (0.5 + 0.5 * age01) * healthVigor))
-        : Math.max(1, Math.round((3 - order * 0.5) * (0.5 + 0.5 * age01) * healthVigor));
-
+    // Spawn child branches
+    if (order < maxOrder && !isDead) {
+      const childCount = Math.max(1, Math.round((3 - order * 0.4) * (0.5 + 0.5 * age01) * healthVigor));
       for (let c = 0; c < childCount; c++) {
         if (rng() > branchProb) continue;
-        
-        // For trunk, skip branches below firstBranchHeight
-        const tAttach = order === 0
-          ? firstBranchHeight + rng() * (0.85 - firstBranchHeight)
-          : 0.2 + rng() * 0.6;
-        
+        const tAttach = 0.15 + rng() * 0.65;
         const attachPos = bezierPoint(p0, p1, p2, p3, tAttach);
         const attachTan = bezierTangent(p0, p1, p2, p3, tAttach);
         const { right, up } = tangentFrame(attachTan);
-
         const tiltAngle = angleMean + (rng() - 0.5) * angleVar;
         const azimuth = rng() * Math.PI * 2;
-
         const childDir = v3normalize(v3add(
-          v3scale(attachTan, Math.cos(tiltAngle) * (order === 0 ? 0.3 : 0.5)),
-          v3add(
-            v3scale(right, Math.sin(tiltAngle) * Math.cos(azimuth)),
-            v3scale(up, Math.sin(tiltAngle) * Math.sin(azimuth))
-          )
+          v3scale(attachTan, Math.cos(tiltAngle) * 0.5),
+          v3add(v3scale(right, Math.sin(tiltAngle) * Math.cos(azimuth)), v3scale(up, Math.sin(tiltAngle) * Math.sin(azimuth)))
         ));
-
         const attachRad = radius + (r1 - radius) * Math.pow(tAttach, 0.6);
         const childRad = attachRad * radiusDecay * (0.5 + rng() * 0.5);
-        
-        // Branch length: for trunk children, use branchLenRatio of full height
-        // For sub-branches, decay from parent
-        let childLen: number;
-        if (order === 0) {
-          const heightFactor = isConifer ? (1 - tAttach * 0.65) : (0.7 + 0.3 * (1 - tAttach));
-          childLen = height * branchLenRatio * heightFactor * (0.7 + rng() * 0.3);
-        } else {
-          childLen = effectiveLength * lengthDecay * (0.6 + rng() * 0.4);
-        }
-
-        // Offset start to surface of parent
-        const surfaceOffset = v3scale(v3normalize(v3add(
-          v3scale(right, Math.cos(azimuth)),
-          v3scale(up, Math.sin(azimuth))
-        )), attachRad * 0.85);
-
+        const childLen = effectiveLength * lengthDecay * (0.6 + rng() * 0.4);
+        const surfaceOffset = v3scale(v3normalize(v3add(v3scale(right, Math.cos(azimuth)), v3scale(up, Math.sin(azimuth)))), attachRad * 0.85);
         growBranch(v3add(attachPos, surfaceOffset), childDir, childLen, childRad, order + 1, depth + 1);
       }
     }
 
-    // Apical continuation — the trunk/branch continues growing from its tip
-    // This is how the trunk naturally extends without "ending"
-    if (!isDead && r1 > 0.01 && effectiveLength > 0.1) {
-      // Trunk (order 0): always continues until it's thin enough to be just another branch
-      // Branches: continue based on apical dominance
-      const shouldContinue = order === 0
-        ? (r1 > baseRadius * 0.08 && depth < 12)  // trunk keeps going until thin
-        : (rng() < apicalDom * 0.5 && order < maxOrder);
-      
-      if (shouldContinue) {
-        const contDir = v3normalize(v3add(dir, [
-          (rng() - 0.5) * (order === 0 ? crookedness * 0.15 : 0.08),
-          order === 0 ? 0.02 : (phototropism * 0.06 - droopAmount * 0.2),
-          (rng() - 0.5) * (order === 0 ? crookedness * 0.15 : 0.08),
-        ] as Vec3));
-        const contLen = effectiveLength * (order === 0 ? 0.85 : 0.6);
-        const contRad = r1 * (order === 0 ? 0.92 : 0.85);
-        growBranch(p3, contDir, contLen, contRad, order, depth + 1);
-      }
+    // Apical continuation for branches
+    if (!isDead && !isBroken && r1 > 0.005 && order < maxOrder && rng() < apicalDom * 0.6) {
+      const contDir = v3normalize(v3add(dir, [
+        (rng() - 0.5) * 0.08,
+        phototropism * 0.06 - droopAmount * 0.2,
+        (rng() - 0.5) * 0.08,
+      ] as Vec3));
+      growBranch(p3, contDir, effectiveLength * 0.6, r1 * 0.85, order, depth + 1);
     }
 
-    // Forking — occasional split into two co-dominant stems
+    // Forking
     if (rng() < forkProbability && order < maxOrder - 1 && !isDead) {
       const forkT = 0.4 + rng() * 0.3;
       const forkPos = bezierPoint(p0, p1, p2, p3, forkT);
@@ -608,11 +549,117 @@ export function generateTreeGeometry(params: TreeParams, seed: number = 1337): T
   }
 
   // ========================================
-  // START GROWING — the trunk is simply order 0, starting from ground
+  // GROW THE TRUNK — one continuous structure from ground to canopy tip.
+  // The trunk is drawn as multiple connected Bezier segments forming one
+  // seamless tube. Branches spawn along it. It never "ends" — it just
+  // tapers until its radius matches a normal branch, then transitions.
   // ========================================
-  const trunkStartDir: Vec3 = v3normalize([restLean * 0.3, 1.0, (rng() - 0.5) * restLean * 0.2]);
-  const trunkSegLen = height * 0.25; // each trunk segment is ~25% of height
-  growBranch([0, 0, 0], trunkStartDir, trunkSegLen, baseRadius, 0, 0);
+  function growTrunk() {
+    const numSegments = isConifer ? 8 : 6;
+    const segLen = height / numSegments;
+    let pos: Vec3 = [0, 0, 0];
+    let dir: Vec3 = v3normalize([restLean * 0.3, 1.0, (rng() - 0.5) * restLean * 0.2]);
+    let rad = baseRadius;
+
+    // Pre-compute trunk path so we know positions for branch spawning
+    const trunkPoints: { pos: Vec3; dir: Vec3; rad: number; t: number }[] = [{ pos, dir, rad, t: 0 }];
+
+    for (let seg = 0; seg < numSegments; seg++) {
+      const t01 = seg / numSegments;
+      const tEnd = (seg + 1) / numSegments;
+
+      // Radius at end of this segment — smooth power taper over full height
+      const radEnd = baseRadius * Math.pow(1 - tEnd, taper * 0.7) * (1 + (flare - 1) * Math.max(0, 1 - tEnd * 8));
+
+      // Direction: slight random crookedness
+      dir = v3normalize([
+        dir[0] + (rng() - 0.5) * crookedness * 0.15,
+        dir[1] + 0.02, // slight upward correction
+        dir[2] + (rng() - 0.5) * crookedness * 0.15,
+      ]);
+
+      const p0 = pos;
+      const curveMag = crookedness * segLen * 0.3;
+      const p1: Vec3 = [
+        p0[0] + dir[0] * segLen * 0.33 + (rng() - 0.5) * curveMag,
+        p0[1] + dir[1] * segLen * 0.33,
+        p0[2] + dir[2] * segLen * 0.33 + (rng() - 0.5) * curveMag,
+      ];
+      const p2: Vec3 = [
+        p0[0] + dir[0] * segLen * 0.66 + (rng() - 0.5) * curveMag,
+        p0[1] + dir[1] * segLen * 0.66,
+        p0[2] + dir[2] * segLen * 0.66 + (rng() - 0.5) * curveMag,
+      ];
+      const p3 = v3add(p0, v3scale(dir, segLen));
+
+      addTube(p0, p1, p2, p3, rad, radEnd, 0, false);
+
+      // Spawn lateral branches along this trunk segment
+      const branchesThisSeg = Math.max(1, Math.round(rawBranchCount / numSegments * (0.7 + rng() * 0.6)));
+      for (let b = 0; b < branchesThisSeg; b++) {
+        // Skip if below first branch height
+        const globalT = t01 + (rng() * (tEnd - t01));
+        if (globalT < firstBranchHeight) continue;
+        if (rng() > branchProb) continue;
+
+        const localT = (globalT - t01) / (tEnd - t01);
+        const attachPos = bezierPoint(p0, p1, p2, p3, localT);
+        const attachTan = bezierTangent(p0, p1, p2, p3, localT);
+        const { right, up } = tangentFrame(attachTan);
+        const attachRad = rad + (radEnd - rad) * Math.pow(localT, 0.6);
+
+        const tiltAngle = angleMean + (rng() - 0.5) * angleVar;
+        const azimuth = rng() * Math.PI * 2;
+
+        const childDir = v3normalize(v3add(
+          v3scale(attachTan, Math.cos(tiltAngle) * 0.3),
+          v3add(
+            v3scale(right, Math.sin(tiltAngle) * Math.cos(azimuth)),
+            v3scale(up, Math.sin(tiltAngle) * Math.sin(azimuth))
+          )
+        ));
+
+        const childRad = attachRad * radiusDecay * (0.5 + rng() * 0.5);
+        // Branch length decreases with height (conifer: strongly; broadleaf: mildly)
+        const heightFactor = isConifer ? (1 - globalT * 0.7) : (0.6 + 0.4 * (1 - globalT));
+        const childLen = height * branchLenRatio * heightFactor * (0.7 + rng() * 0.3);
+
+        const surfaceOffset = v3scale(v3normalize(v3add(
+          v3scale(right, Math.cos(azimuth)),
+          v3scale(up, Math.sin(azimuth))
+        )), attachRad * 0.85);
+
+        growBranch(v3add(attachPos, surfaceOffset), childDir, childLen, childRad, 1, 0);
+      }
+
+      pos = p3;
+      rad = radEnd;
+      trunkPoints.push({ pos, dir, rad, t: tEnd });
+    }
+
+    // The trunk tip: instead of ending, spawn 2-4 terminal leader branches
+    // that continue upward like the trunk was just the biggest branch.
+    // Their radii match the trunk's tip radius — seamless transition.
+    const tipLeaders = isConifer ? 1 : Math.max(2, Math.round(2 + rng() * 2));
+    for (let i = 0; i < tipLeaders; i++) {
+      const spreadAngle = isConifer ? 0.05 : (0.15 + rng() * 0.2);
+      const azimuth = (i / tipLeaders) * Math.PI * 2 + rng() * 0.3;
+      const leaderDir = v3normalize([
+        dir[0] + Math.sin(azimuth) * spreadAngle,
+        dir[1] + 0.1,
+        dir[2] + Math.cos(azimuth) * spreadAngle,
+      ]);
+      // Leaders get equal share of the remaining radius (pipe model)
+      const leaderRad = rad * (isConifer ? 0.85 : 0.7 / Math.sqrt(tipLeaders));
+      const leaderLen = height * 0.15 * (0.7 + rng() * 0.3);
+      growBranch(pos, leaderDir, leaderLen, leaderRad, 1, 0);
+    }
+  }
+
+  // ========================================
+  // START GROWING
+  // ========================================
+  growTrunk();
 
   // ========================================
   // ROOTS
