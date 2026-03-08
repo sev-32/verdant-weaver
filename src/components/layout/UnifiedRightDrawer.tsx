@@ -8,6 +8,7 @@ import { LeavesPanel } from "@/components/panels/right/LeavesPanel";
 import { BarkRootsPanel } from "@/components/panels/right/BarkRootsPanel";
 import { WindLODPanel } from "@/components/panels/right/WindLODPanel";
 import { SpaceColonizationPanel } from "@/components/panels/right/SpaceColonizationPanel";
+import { CrownPanel } from "@/components/panels/right/CrownPanel";
 import { RockShapePanel } from "@/components/panels/rock/RockShapePanel";
 import { RockTerrainPanel } from "@/components/panels/rock/RockTerrainPanel";
 import { RockDisplacementPanel } from "@/components/panels/rock/RockDisplacementPanel";
