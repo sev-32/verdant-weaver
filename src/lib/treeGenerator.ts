@@ -187,6 +187,11 @@ export function generateTreeGeometry(params: TreeParams, seed: number = 1337): T
   const barkMossHex = getP("barkMossColor", "vegetation.trunk.barkMossColor", "#3a5a2a") as string;
   const epicormicDensity = getP("epicormicDensity", "vegetation.branching.epicormicDensity", 0) as number;
   const forkProbability = getP("forkProbability", "vegetation.branching.forkProbability", 0.1) as number;
+  const collarStrength = getP("collarStrength", "vegetation.branching.collarStrength", 0.38) as number;
+  const collarLength = getP("collarLength", "vegetation.branching.collarLength", 0.15) as number;
+  const junctionMetaballStrength = getP("junctionMetaballStrength", "vegetation.branching.junctionMetaballStrength", 0.55) as number;
+  const junctionMetaballRadius = getP("junctionMetaballRadius", "vegetation.branching.junctionMetaballRadius", 1.45) as number;
+  const leafDensity = getP("leafDensity", "vegetation.leaves.cardsPerMeter", 8) as number;
 
   const trunkColor = hexToRgb(trunkColorHex);
   const leafColor = hexToRgb(leafColorHex);
