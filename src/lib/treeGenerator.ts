@@ -556,15 +556,18 @@ export function generateTreeGeometry(params: TreeParams, seed: number = 1337): T
 
     addTube(p0, p1, p2, p3, radius, r1, order, isDead);
 
-    // Leaves on mid-to-terminal branches
+    // Leaves on mid-to-terminal branches — scaled by leafDensity
     if (!isDead) {
       const isTerminal = order >= maxOrder;
       const isNearTerminal = order >= maxOrder - 1;
       const isMid = order >= Math.max(2, maxOrder - 2);
       if (isTerminal || isNearTerminal || isMid) {
-        const numClusters = isTerminal ? 4 : isNearTerminal ? 3 : 1;
+        // Scale cluster count by leafDensity (default 8, so baseline ~1x at 8)
+        const densityMul = Math.max(0.5, leafDensity / 8);
+        const baseCount = isTerminal ? 5 : isNearTerminal ? 4 : 2;
+        const numClusters = Math.max(1, Math.round(baseCount * densityMul));
         for (let lp = 0; lp < numClusters; lp++) {
-          const lt = 0.2 + lp * (0.7 / numClusters);
+          const lt = 0.1 + lp * (0.8 / numClusters);
           addLeafCluster(bezierPoint(p0, p1, p2, p3, lt), dir, order);
         }
         addLeafCluster(p3, dir, order);
