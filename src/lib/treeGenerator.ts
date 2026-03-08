@@ -593,7 +593,10 @@ export function generateTreeGeometry(params: TreeParams, seed: number = 1337): T
         const childRad = attachRad * radiusDecay * (0.5 + rng() * 0.5);
         const childLen = effectiveLength * lengthDecay * (0.6 + rng() * 0.4);
         const surfaceOffset = v3scale(v3normalize(v3add(v3scale(right, Math.cos(azimuth)), v3scale(up, Math.sin(azimuth)))), attachRad * 0.85);
-        growBranch(v3add(attachPos, surfaceOffset), childDir, childLen, childRad, order + 1, depth + 1);
+        const branchStart = v3add(attachPos, surfaceOffset);
+        // Add junction collar for smooth blending
+        if (order <= 2) addJunctionCollar(attachPos, attachTan, childDir, attachRad, childRad);
+        growBranch(branchStart, childDir, childLen, childRad, order + 1, depth + 1);
       }
     }
 
