@@ -206,7 +206,7 @@ export default function Rock3DPreview({ params, seed = 42, className = "" }: Roc
 
     let renderer: THREE.WebGLRenderer;
     try {
-      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     } catch (e) {
       console.warn("Rock3DPreview: WebGL context unavailable", e);
       return;

@@ -183,7 +183,7 @@ export default function Tree3DPreview({
     // Renderer
     let renderer: THREE.WebGLRenderer;
     try {
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
     } catch (e) {
       console.warn("Tree3DPreview: WebGL context unavailable", e);
       return;
