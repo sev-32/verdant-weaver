@@ -657,11 +657,9 @@ export function generateTreeGeometry(params: TreeParams, seed: number = 1337): T
   }
 
   // ========================================
-  // START GROWING — the trunk is simply order 0, starting from ground
+  // START GROWING
   // ========================================
-  const trunkStartDir: Vec3 = v3normalize([restLean * 0.3, 1.0, (rng() - 0.5) * restLean * 0.2]);
-  const trunkSegLen = height * 0.25; // each trunk segment is ~25% of height
-  growBranch([0, 0, 0], trunkStartDir, trunkSegLen, baseRadius, 0, 0);
+  growTrunk();
 
   // ========================================
   // ROOTS
