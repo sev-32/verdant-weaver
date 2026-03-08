@@ -53,29 +53,35 @@ export function UnifiedRightDrawer() {
           })}
         </div>
       )}
-      <ScrollArea className="flex-1">
-        <div className="p-3 space-y-3">
-          {rightPanel === "trunk" && <TrunkPanel subTab={effectiveSubTab} />}
-          {rightPanel === "branching" && <BranchingPanel subTab={effectiveSubTab} />}
-          {rightPanel === "crown" && <CrownPanel subTab={effectiveSubTab} />}
-          {rightPanel === "leaves" && <LeavesPanel subTab={effectiveSubTab} />}
-          {rightPanel === "bark-roots" && <BarkRootsPanel subTab={effectiveSubTab} />}
-          {rightPanel === "wind-lod" && <WindLODPanel subTab={effectiveSubTab} />}
-          {rightPanel === "space-colonization" && <SpaceColonizationPanel subTab={effectiveSubTab} />}
-          {rightPanel === "rock-shape" && <RockShapePanel />}
-          {rightPanel === "rock-terrain" && <RockTerrainPanel />}
-          {rightPanel === "rock-displacement" && <RockDisplacementPanel />}
-          {rightPanel === "rock-erosion" && <RockErosionPanel />}
-          {rightPanel === "rock-foliation" && <RockFoliationPanel />}
-          {rightPanel === "rock-material" && <RockMaterialPanel />}
-          {rightPanel === "rock-weathering" && <RockWeatheringPanel />}
-          {rightPanel === "rock-growth" && <RockGrowthPanel />}
-          {rightPanel === "rock-biology" && <RockBiologyPanel />}
-          {rightPanel === "rock-csg" && <RockCSGPanel />}
-          {rightPanel === "rock-scene" && <RockScenePanel />}
-          {rightPanel === "rock-developer" && <RockDeveloperPanel />}
+      {rightPanel === "ai-analyst" ? (
+        <div className="flex-1 overflow-y-auto p-3">
+          <AIAnalystPanel />
         </div>
-      </ScrollArea>
+      ) : (
+        <ScrollArea className="flex-1">
+          <div className="p-3 space-y-3">
+            {rightPanel === "trunk" && <TrunkPanel subTab={effectiveSubTab} />}
+            {rightPanel === "branching" && <BranchingPanel subTab={effectiveSubTab} />}
+            {rightPanel === "crown" && <CrownPanel subTab={effectiveSubTab} />}
+            {rightPanel === "leaves" && <LeavesPanel subTab={effectiveSubTab} />}
+            {rightPanel === "bark-roots" && <BarkRootsPanel subTab={effectiveSubTab} />}
+            {rightPanel === "wind-lod" && <WindLODPanel subTab={effectiveSubTab} />}
+            {rightPanel === "space-colonization" && <SpaceColonizationPanel subTab={effectiveSubTab} />}
+            {rightPanel === "rock-shape" && <RockShapePanel />}
+            {rightPanel === "rock-terrain" && <RockTerrainPanel />}
+            {rightPanel === "rock-displacement" && <RockDisplacementPanel />}
+            {rightPanel === "rock-erosion" && <RockErosionPanel />}
+            {rightPanel === "rock-foliation" && <RockFoliationPanel />}
+            {rightPanel === "rock-material" && <RockMaterialPanel />}
+            {rightPanel === "rock-weathering" && <RockWeatheringPanel />}
+            {rightPanel === "rock-growth" && <RockGrowthPanel />}
+            {rightPanel === "rock-biology" && <RockBiologyPanel />}
+            {rightPanel === "rock-csg" && <RockCSGPanel />}
+            {rightPanel === "rock-scene" && <RockScenePanel />}
+            {rightPanel === "rock-developer" && <RockDeveloperPanel />}
+          </div>
+        </ScrollArea>
+      )}
     </div>
   );
 }
