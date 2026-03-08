@@ -722,16 +722,22 @@ export function generateTreeGeometry(params: TreeParams, seed: number = 1337): T
     1,
     leanZ * 0.3 + (rng() - 0.5) * 0.08,
   ]);
-  const leaderLen = height * 0.35 * apicalDom;
-  const leaderRad = baseRadius * Math.pow(0.4, taper) * 0.5;
-  let trunkTopCx = trunkTopY * leanX * 0.6;
-  let trunkTopCz = trunkTopY * leanZ * 0.6;
-  // Add knot offsets at trunk top
+  const leaderLen = height * 0.4 * apicalDom;
+  const leaderRad = Math.max(trunkTopMinRadius, baseRadius * Math.pow(0.4, taper) * 0.5);
+  // Compute trunk top centerline using same formula as trunk ring at t=1.0
+  let trunkTopCx = 1.0 * leanX; // t=1.0 so t*t = 1.0
+  let trunkTopCz = 1.0 * leanZ;
   for (const k of knots) {
-    const d = (1 - k.t) / k.width;
+    const d = (1.0 - k.t) / k.width;
     const g = Math.exp(-d * d * 0.5);
-    trunkTopCx += k.dx * k.amp * g * 0.5;
-    trunkTopCz += k.dz * k.amp * g * 0.5;
+    trunkTopCx += k.dx * k.amp * g;
+    trunkTopCz += k.dz * k.amp * g;
+  }
+  for (const c of crookOffsets) {
+    const d = (1.0 - c.t) / 0.15;
+    const g = Math.exp(-d * d * 0.5);
+    trunkTopCx += c.dx * g;
+    trunkTopCz += c.dz * g;
   }
   const trunkTop: Vec3 = [trunkTopCx, trunkTopY, trunkTopCz];
   generateBranch(trunkTop, leaderDir, leaderLen, leaderRad, 1, 0);
