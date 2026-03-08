@@ -56,6 +56,7 @@ export function UnifiedRightDrawer() {
         <div className="p-3 space-y-3">
           {rightPanel === "trunk" && <TrunkPanel subTab={effectiveSubTab} />}
           {rightPanel === "branching" && <BranchingPanel subTab={effectiveSubTab} />}
+          {rightPanel === "crown" && <CrownPanel subTab={effectiveSubTab} />}
           {rightPanel === "leaves" && <LeavesPanel subTab={effectiveSubTab} />}
           {rightPanel === "bark-roots" && <BarkRootsPanel subTab={effectiveSubTab} />}
           {rightPanel === "wind-lod" && <WindLODPanel subTab={effectiveSubTab} />}
