@@ -4,6 +4,7 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { useProVegLayout } from "@/contexts/ProVegLayoutContext";
 import { generateRockGeometry } from "@/lib/rockGenerator";
 import { mergeRockGeometries } from "@/lib/csgMerge";
+import { registerRenderer, unregisterRenderer } from "@/hooks/useScreenshotCapture";
 import type { RockParams } from "@/types/rockParams";
 
 interface Rock3DPreviewProps {
@@ -205,7 +206,7 @@ export default function Rock3DPreview({ params, seed = 42, className = "" }: Roc
 
     let renderer: THREE.WebGLRenderer;
     try {
-      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     } catch (e) {
       console.warn("Rock3DPreview: WebGL context unavailable", e);
       return;
@@ -265,6 +266,9 @@ export default function Rock3DPreview({ params, seed = 42, className = "" }: Roc
     const clock = new THREE.Clock();
     sceneRef.current = { scene, camera, renderer, controls, rockGroup, animFrame: 0, clock };
 
+    // Register for screenshot capture
+    registerRenderer(renderer, scene, camera, controls);
+
     buildRock();
 
     const animate = () => {
@@ -291,6 +295,7 @@ export default function Rock3DPreview({ params, seed = 42, className = "" }: Roc
 
     return () => {
       resizeObserver.disconnect();
+      unregisterRenderer();
       const ctx = sceneRef.current;
       if (ctx) {
         cancelAnimationFrame(ctx.animFrame);

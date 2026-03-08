@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { useProVegLayout } from "@/contexts/ProVegLayoutContext";
 import { generateTreeGeometry } from "@/lib/treeGenerator";
+import { registerRenderer, unregisterRenderer } from "@/hooks/useScreenshotCapture";
 import type { TreeParams } from "@/types/treeParams";
 
 interface Tree3DPreviewProps {
@@ -182,7 +183,7 @@ export default function Tree3DPreview({
     // Renderer
     let renderer: THREE.WebGLRenderer;
     try {
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
     } catch (e) {
       console.warn("Tree3DPreview: WebGL context unavailable", e);
       return;
@@ -269,6 +270,9 @@ export default function Tree3DPreview({
       animFrame: 0, clock,
     };
 
+    // Register for screenshot capture
+    registerRenderer(renderer, scene, camera, controls);
+
     // Build initial tree
     buildTree();
 
@@ -313,6 +317,7 @@ export default function Tree3DPreview({
 
     return () => {
       resizeObserver.disconnect();
+      unregisterRenderer();
       const ctx = sceneRef.current;
       if (ctx) {
         cancelAnimationFrame(ctx.animFrame);

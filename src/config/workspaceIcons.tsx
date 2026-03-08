@@ -4,6 +4,7 @@ import {
   AlertTriangle, Layers, Minus, Palette, Box, Sprout, Eye,
   Target, PanelLeftClose, PanelRightClose, Gem, Droplets,
   Paintbrush, Hexagon, Settings, Thermometer, Combine,
+  Sparkles, Layout, Bug, Waves, Heart,
   type LucideIcon,
 } from "lucide-react";
 
@@ -13,6 +14,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   AlertTriangle, Layers, Minus, Palette, Box, Sprout, Eye,
   Target, PanelLeftClose, PanelRightClose, Gem, Droplets,
   Paintbrush, Hexagon, Settings, Thermometer, Combine,
+  Sparkles, Layout, Bug, Waves, Heart,
   Root: Sprout,
   Network: GitBranch,
 };

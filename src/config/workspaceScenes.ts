@@ -84,6 +84,10 @@ export const RIGHT_PANELS: RightPanelConfig[] = [
       { id: "crown", label: "Crown", icon: "Cloud" },
     ],
   },
+  {
+    id: "ai-analyst", label: "AI Analyst", icon: "Sparkles",
+    subTabs: [],
+  },
 ];
 
 // Rock editor panels
@@ -100,4 +104,5 @@ export const ROCK_RIGHT_PANELS: RightPanelConfig[] = [
   { id: "rock-csg", label: "CSG Merge", icon: "Combine", subTabs: [] },
   { id: "rock-scene", label: "Scene", icon: "Layout", subTabs: [] },
   { id: "rock-developer", label: "Developer", icon: "Settings", subTabs: [] },
+  { id: "ai-analyst", label: "AI Analyst", icon: "Sparkles", subTabs: [] },
 ];
