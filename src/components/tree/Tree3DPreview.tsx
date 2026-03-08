@@ -270,6 +270,9 @@ export default function Tree3DPreview({
       animFrame: 0, clock,
     };
 
+    // Register for screenshot capture
+    registerRenderer(renderer, scene, camera, controls);
+
     // Build initial tree
     buildTree();
 
