@@ -1,21 +1,41 @@
 import React, { useState, useRef, useCallback } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Camera, Orbit, Sparkles, Trash2, Send, Loader2 } from "lucide-react";
+import { Camera, Orbit, Sparkles, Trash2, Send, Loader2, FileCode, BookOpen } from "lucide-react";
 import { useProVegLayout } from "@/contexts/ProVegLayoutContext";
 import { useScreenshotCapture } from "@/hooks/useScreenshotCapture";
 import type { Screenshot } from "@/types/screenshot";
-import { supabase } from "@/integrations/supabase/client";
 
 const ANALYSIS_PRESETS = [
-  { label: "Visual Realism", prompt: "Analyze these screenshots for visual realism. What looks wrong? What should be improved? Be specific about geometry, taper, branching, and overall form.", type: "visual-only" as const },
-  { label: "Full Rebuild", prompt: "This system needs a full rebuild. Analyze the current state from screenshots and docs, and give a prioritized architectural roadmap for fixing the core generation engine. Be brutally honest.", type: "full" as const },
+  { label: "Visual Realism", prompt: "Analyze these screenshots for visual realism. What looks wrong? What should be improved? Be specific about geometry, taper, branching, and overall form. Give concrete parameter and code changes.", type: "visual-only" as const },
+  { label: "Full Rebuild", prompt: "This system needs a full rebuild. Analyze the current state from screenshots, code, and docs, and give a prioritized architectural roadmap for fixing the core generation engine. Be brutally honest about what's broken.", type: "full" as const },
   { label: "Parameter Tune", prompt: "Based on the current visual output, suggest specific parameter changes (with exact values) that would improve realism. Reference actual parameter names from the codebase.", type: "full" as const },
-  { label: "Code Review", prompt: "Review the tree/rock generator code for mathematical correctness, performance issues, and architectural problems. Suggest specific fixes.", type: "full" as const },
+  { label: "Code Review", prompt: "Review the tree/rock generator code for mathematical correctness, performance issues, and architectural problems. Suggest specific code fixes with examples.", type: "full" as const },
 ];
 
+// Summary of key docs for AI context (keeps payload manageable)
+const DOC_CONTEXT = `ProVeg Studio is a procedural 3D tree and rock generator built with Three.js and TypeScript.
+
+TREE ENGINE ARCHITECTURE:
+- Unified recursive branching system where the trunk is the primary (Order 0) branch
+- Uses Bezier curves for smooth branch geometry with radial tube generation
+- Species profiles (Oak, Pine, Birch, Willow, Acacia, Spruce) apply multipliers to base params
+- Key params: height, baseRadius, branchCount, branchAngle, taperFactor, crookedness, gravityResponse, phototropism
+- Wind simulation via vertex shader displacement
+- The trunk grows via apical dominance (tip-growth) until radius drops below threshold
+
+DESIGN PHILOSOPHY (from OPUS Visual Interface Canon):
+- Every parameter control should be a visual authoring instrument, not a generic slider
+- The system aims for computational botany, not just procedural generation
+- Trees should look like organisms shaped by environment (wind, light, gravity)
+
+KNOWN ISSUES HISTORY:
+- Previous iterations had "bolted-on" trunk/branch junctions
+- Taper formula issues caused trunk to thin to zero at peak
+- Flat-top termination problems where trunk abruptly ended`;
+
 export function AIAnalystPanel() {
-  const { studioMode, seed } = useProVegLayout();
+  const { studioMode, seed, treeParams, rockParams } = useProVegLayout();
   const { captureCurrentView, captureFixedAngles } = useScreenshotCapture();
 
   const [screenshots, setScreenshots] = useState<Screenshot[]>([]);
@@ -23,7 +43,8 @@ export function AIAnalystPanel() {
   const [aiResponse, setAiResponse] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [customPrompt, setCustomPrompt] = useState("");
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [includeCode, setIncludeCode] = useState(true);
+  const [includeDocs, setIncludeDocs] = useState(true);
 
   const handleManualCapture = useCallback(() => {
     const ss = captureCurrentView("Manual Capture", studioMode, seed);
@@ -72,7 +93,7 @@ export function AIAnalystPanel() {
     setAiResponse("");
 
     try {
-      const body: any = {
+      const body: Record<string, unknown> = {
         screenshots: selected.map(s => ({
           dataUrl: s.dataUrl,
           label: s.label,
@@ -84,12 +105,17 @@ export function AIAnalystPanel() {
         analysisType,
       };
 
-      // Include docs for full analysis
-      if (analysisType === "full") {
-        body.docs = [
-          "ProVeg Studio is a procedural 3D tree and rock generator built with Three.js. The tree engine uses a unified recursive branching system where the trunk is the primary (order 0) branch.",
-        ];
+      // Include docs context
+      if (includeDocs) {
+        body.docs = [DOC_CONTEXT];
       }
+
+      // Include current parameters as context
+      const currentParams = studioMode === "tree" ? treeParams : rockParams;
+      body.docs = [
+        ...(body.docs as string[] || []),
+        `CURRENT ${studioMode.toUpperCase()} PARAMETERS:\n${JSON.stringify(currentParams, null, 2)}`,
+      ];
 
       const resp = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-analyst`,
@@ -115,13 +141,14 @@ export function AIAnalystPanel() {
         return;
       }
 
-      // Stream the response
+      // Stream the response - filter out reasoning tokens, only show content
       const reader = resp.body.getReader();
       const decoder = new TextDecoder();
       let textBuffer = "";
       let fullResponse = "";
+      let streamDone = false;
 
-      while (true) {
+      while (!streamDone) {
         const { done, value } = await reader.read();
         if (done) break;
         textBuffer += decoder.decode(value, { stream: true });
@@ -136,20 +163,50 @@ export function AIAnalystPanel() {
           if (!line.startsWith("data: ")) continue;
 
           const jsonStr = line.slice(6).trim();
-          if (jsonStr === "[DONE]") break;
+          if (jsonStr === "[DONE]") {
+            streamDone = true;
+            break;
+          }
 
           try {
             const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content;
-            if (content) {
+            const delta = parsed.choices?.[0]?.delta;
+            // Only extract content, skip reasoning tokens
+            const content = delta?.content;
+            if (content && content.length > 0) {
               fullResponse += content;
               setAiResponse(fullResponse);
             }
           } catch {
+            // Incomplete JSON, put back and wait
             textBuffer = line + "\n" + textBuffer;
             break;
           }
         }
+      }
+
+      // Final flush
+      if (textBuffer.trim()) {
+        for (let raw of textBuffer.split("\n")) {
+          if (!raw) continue;
+          if (raw.endsWith("\r")) raw = raw.slice(0, -1);
+          if (raw.startsWith(":") || raw.trim() === "") continue;
+          if (!raw.startsWith("data: ")) continue;
+          const jsonStr = raw.slice(6).trim();
+          if (jsonStr === "[DONE]") continue;
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const content = parsed.choices?.[0]?.delta?.content;
+            if (content && content.length > 0) {
+              fullResponse += content;
+              setAiResponse(fullResponse);
+            }
+          } catch { /* ignore */ }
+        }
+      }
+
+      if (!fullResponse) {
+        setAiResponse("⚠️ No response received. The model may still be thinking — try again.");
       }
     } catch (e) {
       console.error("Analysis error:", e);
@@ -157,10 +214,10 @@ export function AIAnalystPanel() {
     } finally {
       setIsAnalyzing(false);
     }
-  }, [screenshots, selectedScreenshots]);
+  }, [screenshots, selectedScreenshots, studioMode, treeParams, rockParams, includeDocs]);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="space-y-3">
       {/* Capture buttons */}
       <div className="editor-section">
         <div className="editor-section-title">Capture</div>
@@ -223,6 +280,33 @@ export function AIAnalystPanel() {
         </div>
       )}
 
+      {/* Context toggles */}
+      <div className="editor-section">
+        <div className="editor-section-title">Context</div>
+        <div className="flex gap-1.5">
+          <button
+            className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] transition-colors ${
+              includeDocs
+                ? "bg-primary/15 text-primary"
+                : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+            }`}
+            onClick={() => setIncludeDocs(!includeDocs)}
+          >
+            <BookOpen className="h-3 w-3" /> Docs
+          </button>
+          <button
+            className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] transition-colors ${
+              includeCode
+                ? "bg-primary/15 text-primary"
+                : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+            }`}
+            onClick={() => setIncludeCode(!includeCode)}
+          >
+            <FileCode className="h-3 w-3" /> Params
+          </button>
+        </div>
+      </div>
+
       {/* Analysis presets */}
       <div className="editor-section">
         <div className="editor-section-title">AI Analysis</div>
@@ -247,7 +331,6 @@ export function AIAnalystPanel() {
       <div className="editor-section">
         <div className="flex gap-1">
           <textarea
-            ref={textareaRef}
             className="flex-1 bg-input border border-border rounded px-2 py-1.5 text-[11px] text-foreground resize-none placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
             rows={2}
             placeholder="Ask the AI anything about the current model..."
@@ -285,21 +368,17 @@ export function AIAnalystPanel() {
       </div>
 
       {/* AI Response */}
-      {aiResponse && (
-        <div className="flex-1 min-h-0">
-          <div className="editor-section-title px-0">Response</div>
-          <ScrollArea className="h-[300px]">
+      {(aiResponse || isAnalyzing) && (
+        <div className="editor-section">
+          <div className="editor-section-title flex items-center gap-2">
+            Response
+            {isAnalyzing && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
+          </div>
+          <ScrollArea className="max-h-[400px]">
             <div className="text-[11px] leading-relaxed text-foreground whitespace-pre-wrap pr-2">
-              {aiResponse}
+              {aiResponse || "Thinking..."}
             </div>
           </ScrollArea>
-        </div>
-      )}
-
-      {isAnalyzing && !aiResponse && (
-        <div className="flex items-center gap-2 py-4 justify-center text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          <span className="text-[11px]">Analyzing...</span>
         </div>
       )}
     </div>
