@@ -21,6 +21,7 @@ import { RockBiologyPanel } from "@/components/panels/rock/RockBiologyPanel";
 import { RockCSGPanel } from "@/components/panels/rock/RockCSGPanel";
 import { RockDeveloperPanel } from "@/components/panels/rock/RockDeveloperPanel";
 import { RockScenePanel } from "@/components/panels/rock/RockScenePanel";
+import { AIAnalystPanel } from "@/components/panels/AIAnalystPanel";
 import { X } from "lucide-react";
 
 export function UnifiedRightDrawer() {
