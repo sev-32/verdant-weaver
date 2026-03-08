@@ -38,15 +38,25 @@ export const RIGHT_PANELS: RightPanelConfig[] = [
     id: "branching", label: "Branching", icon: "GitBranch",
     subTabs: [
       { id: "structure", label: "Structure", icon: "Network" },
+      { id: "physics", label: "Physics", icon: "Magnet" },
       { id: "junction", label: "Junction", icon: "Merge" },
       { id: "gesture", label: "Gesture", icon: "Move" },
       { id: "damage", label: "Damage", icon: "AlertTriangle" },
     ],
   },
   {
+    id: "crown", label: "Crown", icon: "Cloud",
+    subTabs: [
+      { id: "shape", label: "Shape", icon: "Circle" },
+      { id: "density", label: "Density", icon: "Layers" },
+      { id: "health", label: "Health", icon: "Heart" },
+    ],
+  },
+  {
     id: "leaves", label: "Leaves", icon: "Leaf",
     subTabs: [
-      { id: "representation", label: "Representation", icon: "Layers" },
+      { id: "representation", label: "Cards", icon: "Layers" },
+      { id: "orientation", label: "Orientation", icon: "RotateCw" },
       { id: "petiole", label: "Petiole", icon: "Minus" },
       { id: "color", label: "Color", icon: "Palette" },
     ],
@@ -55,6 +65,7 @@ export const RIGHT_PANELS: RightPanelConfig[] = [
     id: "bark-roots", label: "Bark & Roots", icon: "Mountain",
     subTabs: [
       { id: "bark", label: "Bark", icon: "Box" },
+      { id: "moss", label: "Moss & Lichen", icon: "Sprout" },
       { id: "roots", label: "Roots", icon: "Sprout" },
     ],
   },
@@ -62,6 +73,7 @@ export const RIGHT_PANELS: RightPanelConfig[] = [
     id: "wind-lod", label: "Wind & LOD", icon: "Wind",
     subTabs: [
       { id: "wind", label: "Wind", icon: "Wind" },
+      { id: "advanced", label: "Advanced", icon: "Settings" },
       { id: "lod", label: "LOD", icon: "Eye" },
     ],
   },
