@@ -201,9 +201,11 @@ export function generateTreeGeometry(params: TreeParams, seed: number = 1337): T
   const wood = { positions: [] as number[], normals: [] as number[], colors: [] as number[], indices: [] as number[] };
   const leaves = { positions: [] as number[], normals: [] as number[], colors: [] as number[], indices: [] as number[] };
 
-  const trunkTopY = height * 0.6;
+  const trunkTopY = height * 0.55;
   const segments = 16;
   const rings = 22;
+  // Minimum radius at trunk top so it doesn't taper to a point
+  const trunkTopMinRadius = baseRadius * 0.18;
 
   // Generate knot positions along trunk
   const knots: { t: number; dx: number; dz: number; amp: number; width: number }[] = [];
