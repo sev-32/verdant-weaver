@@ -60,12 +60,12 @@ export const DEFAULT_TREE_PARAMS: TreeParams = {
 
   // Crown shape
   "vegetation.crown.shape": "SPHERE", crownShape: "SPHERE",
-  "vegetation.crown.crownRadiusRatio": 0.42, crownRadiusRatio: 0.42,
-  "vegetation.crown.heightRatio": 0.65, crownHeightRatio: 0.65,
+  "vegetation.crown.crownRadiusRatio": 0.55, crownRadiusRatio: 0.55,
+  "vegetation.crown.heightRatio": 0.75, crownHeightRatio: 0.75,
   "vegetation.crown.asymmetry": 0.1, crownAsymmetry: 0.1,
-  "vegetation.crown.densityFalloff": 0.5, crownDensityFalloff: 0.5,
+  "vegetation.crown.densityFalloff": 0.3, crownDensityFalloff: 0.3,
   "vegetation.crown.flatTop": 0, crownFlatTop: 0,
-  "vegetation.crown.openness": 0.15, crownOpenness: 0.15,
+  "vegetation.crown.openness": 0.05, crownOpenness: 0.05,
   "vegetation.crown.skirt": 0.0, crownSkirt: 0.0,
   "vegetation.crown.innerVoidRadius": 0.3, crownInnerVoid: 0.3,
   "vegetation.crown.verticalBias": 0.0, crownVerticalBias: 0.0,
