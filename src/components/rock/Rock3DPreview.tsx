@@ -4,6 +4,7 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { useProVegLayout } from "@/contexts/ProVegLayoutContext";
 import { generateRockGeometry } from "@/lib/rockGenerator";
 import { mergeRockGeometries } from "@/lib/csgMerge";
+import { registerRenderer, unregisterRenderer } from "@/hooks/useScreenshotCapture";
 import type { RockParams } from "@/types/rockParams";
 
 interface Rock3DPreviewProps {
