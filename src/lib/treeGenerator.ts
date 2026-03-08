@@ -669,23 +669,7 @@ export function generateTreeGeometry(params: TreeParams, seed: number = 1337): T
     }
   }
 
-  // ========================================
-  // EPICORMIC SHOOTS
-  // ========================================
-  if (epicormicDensity > 0) {
-    const epicCount = Math.round(epicormicDensity * rawBranchCount * 0.5);
-    for (let i = 0; i < epicCount; i++) {
-      const tNorm = 0.15 + rng() * 0.4;
-      const trunk = getPointOnTrunk(tNorm);
-      const az = rng() * Math.PI * 2;
-      const epicDir: Vec3 = v3normalize([Math.cos(az) * 0.6, 0.4, Math.sin(az) * 0.6]);
-      const epicLen = height * 0.05 * (0.5 + rng() * 0.5);
-      growBranch(
-        v3add(trunk.pos, v3scale(v3normalize([Math.cos(az), 0, Math.sin(az)]), trunk.radius * 0.9)),
-        epicDir, epicLen, trunk.radius * 0.04, maxOrder - 1, 0
-      );
-    }
-  }
+  // Epicormic shoots are now handled inside growBranch via the child-spawning logic
 
   return {
     wood,
