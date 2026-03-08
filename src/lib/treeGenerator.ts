@@ -307,7 +307,9 @@ export function generateTreeGeometry(params: TreeParams, seed: number = 1337): T
     }
 
     // Radius with taper and flare
+    // Radius with taper and flare - ensure minimum radius at top
     let radius = baseRadius * Math.pow(Math.max(0.001, 1 - t), taper);
+    radius = Math.max(radius, trunkTopMinRadius * (1 - t * 0.3)); // never taper to a point
     if (t < 0.1) {
       radius *= 1 + (flare - 1) * Math.pow(1 - t / 0.1, 2);
     }
