@@ -703,6 +703,8 @@ export function generateTreeGeometry(params: TreeParams, seed: number = 1337): T
           v3scale(up, Math.sin(azimuth))
         )), attachRad * 0.85);
 
+        // Add junction collar at trunk-branch attachment
+        addJunctionCollar(attachPos, attachTan, childDir, attachRad, childRad);
         growBranch(v3add(attachPos, surfaceOffset), childDir, childLen, childRad, 1, 0);
       }
 
