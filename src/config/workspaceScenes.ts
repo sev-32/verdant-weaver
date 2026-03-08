@@ -84,6 +84,10 @@ export const RIGHT_PANELS: RightPanelConfig[] = [
       { id: "crown", label: "Crown", icon: "Cloud" },
     ],
   },
+  {
+    id: "ai-analyst", label: "AI Analyst", icon: "Sparkles",
+    subTabs: [],
+  },
 ];
 
 // Rock editor panels
