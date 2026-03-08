@@ -201,9 +201,11 @@ export function generateTreeGeometry(params: TreeParams, seed: number = 1337): T
   const wood = { positions: [] as number[], normals: [] as number[], colors: [] as number[], indices: [] as number[] };
   const leaves = { positions: [] as number[], normals: [] as number[], colors: [] as number[], indices: [] as number[] };
 
-  const trunkTopY = height * 0.6;
+  const trunkTopY = height * 0.55;
   const segments = 16;
   const rings = 22;
+  // Minimum radius at trunk top so it doesn't taper to a point
+  const trunkTopMinRadius = baseRadius * 0.18;
 
   // Generate knot positions along trunk
   const knots: { t: number; dx: number; dz: number; amp: number; width: number }[] = [];
@@ -305,7 +307,9 @@ export function generateTreeGeometry(params: TreeParams, seed: number = 1337): T
     }
 
     // Radius with taper and flare
+    // Radius with taper and flare - ensure minimum radius at top
     let radius = baseRadius * Math.pow(Math.max(0.001, 1 - t), taper);
+    radius = Math.max(radius, trunkTopMinRadius * (1 - t * 0.3)); // never taper to a point
     if (t < 0.1) {
       radius *= 1 + (flare - 1) * Math.pow(1 - t / 0.1, 2);
     }
@@ -718,16 +722,22 @@ export function generateTreeGeometry(params: TreeParams, seed: number = 1337): T
     1,
     leanZ * 0.3 + (rng() - 0.5) * 0.08,
   ]);
-  const leaderLen = height * 0.35 * apicalDom;
-  const leaderRad = baseRadius * Math.pow(0.4, taper) * 0.5;
-  let trunkTopCx = trunkTopY * leanX * 0.6;
-  let trunkTopCz = trunkTopY * leanZ * 0.6;
-  // Add knot offsets at trunk top
+  const leaderLen = height * 0.4 * apicalDom;
+  const leaderRad = Math.max(trunkTopMinRadius, baseRadius * Math.pow(0.4, taper) * 0.5);
+  // Compute trunk top centerline using same formula as trunk ring at t=1.0
+  let trunkTopCx = 1.0 * leanX; // t=1.0 so t*t = 1.0
+  let trunkTopCz = 1.0 * leanZ;
   for (const k of knots) {
-    const d = (1 - k.t) / k.width;
+    const d = (1.0 - k.t) / k.width;
     const g = Math.exp(-d * d * 0.5);
-    trunkTopCx += k.dx * k.amp * g * 0.5;
-    trunkTopCz += k.dz * k.amp * g * 0.5;
+    trunkTopCx += k.dx * k.amp * g;
+    trunkTopCz += k.dz * k.amp * g;
+  }
+  for (const c of crookOffsets) {
+    const d = (1.0 - c.t) / 0.15;
+    const g = Math.exp(-d * d * 0.5);
+    trunkTopCx += c.dx * g;
+    trunkTopCz += c.dz * g;
   }
   const trunkTop: Vec3 = [trunkTopCx, trunkTopY, trunkTopCz];
   generateBranch(trunkTop, leaderDir, leaderLen, leaderRad, 1, 0);
