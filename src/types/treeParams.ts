@@ -164,7 +164,7 @@ export const DEFAULT_TREE_PARAMS: TreeParams = {
   "vegetation.wind.twigBend": 0.25, twigBend: 0.25,
   "vegetation.wind.canopyShear": 0.12, canopyShear: 0.12,
   "vegetation.wind.phaseRandom": 0.8, phaseRandom: 0.8,
-  "vegetation.wind.restLean": 0.22, restLean: 0.22,
+  "vegetation.wind.restLean": 0.05, restLean: 0.05,
   "vegetation.wind.gustFrequency": 1.0, windGustFrequency: 1.0,
   "vegetation.wind.directionVariance": 0.35, windDirectionVariance: 0.35,
   "vegetation.wind.turbulence": 0.5, windTurbulence: 0.5,
