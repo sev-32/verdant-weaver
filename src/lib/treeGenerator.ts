@@ -434,6 +434,69 @@ export function generateTreeGeometry(params: TreeParams, seed: number = 1337): T
   }
 
   // ========================================
+  // JUNCTION COLLAR — adds swelling geometry at branch attachment point
+  // ========================================
+  function addJunctionCollar(
+    attachPos: Vec3, attachTan: Vec3, branchDir: Vec3,
+    parentRadius: number, childRadius: number
+  ) {
+    if (collarStrength < 0.01) return;
+    
+    const collarRad = parentRadius * (1 + collarStrength * 0.6);
+    const collarLen = collarLength * parentRadius * 4;
+    const metaballR = junctionMetaballRadius;
+    const metaballS = junctionMetaballStrength;
+    
+    // Create a short, wide tube segment that bridges parent to child
+    // This collar swells outward around the junction point
+    const collarSegs = 4;
+    const collarRings = 8;
+    const baseIdx = wood.positions.length / 3;
+    
+    // Blend direction from parent tangent towards branch direction
+    for (let i = 0; i <= collarSegs; i++) {
+      const t = i / collarSegs;
+      // Position interpolates from just before junction to just after
+      const blendDir = v3normalize(v3lerp(attachTan, branchDir, t));
+      const pos = v3add(attachPos, v3scale(blendDir, (t - 0.3) * collarLen));
+      const { right, up } = tangentFrame(blendDir);
+      
+      // Radius: swells at junction (t~0.3) then tapers to child radius
+      const swellT = 1 - Math.pow(2 * Math.abs(t - 0.35), 2);
+      const swell = metaballS * swellT * parentRadius * 0.3;
+      const baseR = parentRadius * (1 - t * 0.3) * (1 - t) + childRadius * t;
+      const rad = baseR + swell;
+      
+      for (let j = 0; j <= collarRings; j++) {
+        const angle = (j / collarRings) * Math.PI * 2;
+        const cosA = Math.cos(angle);
+        const sinA = Math.sin(angle);
+        const normal = v3add(v3scale(right, cosA), v3scale(up, sinA));
+        const vertex = v3add(pos, v3scale(normal, rad));
+        
+        wood.positions.push(vertex[0], vertex[1], vertex[2]);
+        wood.normals.push(normal[0], normal[1], normal[2]);
+        
+        // Slightly darker bark at junction
+        const cv = (rng() - 0.5) * barkColorVar * 0.3;
+        wood.colors.push(
+          clamp(trunkColor[0] * 0.85 + cv, 0, 1),
+          clamp(trunkColor[1] * 0.85 + cv, 0, 1),
+          clamp(trunkColor[2] * 0.85 + cv, 0, 1)
+        );
+      }
+    }
+    
+    for (let i = 0; i < collarSegs; i++) {
+      for (let j = 0; j < collarRings; j++) {
+        const a = baseIdx + i * (collarRings + 1) + j;
+        const b = a + collarRings + 1;
+        wood.indices.push(a, b, a + 1, a + 1, b, b + 1);
+      }
+    }
+  }
+
+  // ========================================
   // GROW A BRANCH (order > 0) — recursive with sub-branching
   // ========================================
   function growBranch(
