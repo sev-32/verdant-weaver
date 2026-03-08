@@ -266,6 +266,9 @@ export default function Rock3DPreview({ params, seed = 42, className = "" }: Roc
     const clock = new THREE.Clock();
     sceneRef.current = { scene, camera, renderer, controls, rockGroup, animFrame: 0, clock };
 
+    // Register for screenshot capture
+    registerRenderer(renderer, scene, camera, controls);
+
     buildRock();
 
     const animate = () => {
