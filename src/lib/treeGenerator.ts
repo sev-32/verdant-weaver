@@ -388,35 +388,44 @@ export function generateTreeGeometry(params: TreeParams, seed: number = 1337): T
     for (const apex of apices) {
       const inf = apexInfluences.get(apex.nodeId)!;
       const isTrunkApex = apex.level === 0;
+      const apexY = nodes[apex.nodeId].pos[1];
 
       // Direction = blend(attractor pull, axial bias, photo, gravity, jitter).
       let dir: Vec3 = [0, 0, 0];
       if (inf.count > 0) {
         dir = v3normalize(inf.sum);
       } else {
-        // No attractors in range — keep going along axis but slowly fade.
+        // No attractors in range — keep going along axis.
         dir = apex.axis;
       }
 
-      // Apical dominance: trunk apex strongly biased upward; lateral apices less.
-      const apicalWeight = isTrunkApex ? apicalDom : Math.max(0.15, apicalDom - 0.55);
+      // Apical dominance — trunk MUST keep climbing. Strong upward bias for trunk
+      // until it has reached at least crownCenterY; lateral apices respect their axis less.
+      const trunkClimbBias = isTrunkApex ? clamp(1 - (apexY / Math.max(0.1, height * 0.95)), 0.15, 1.0) : 0;
+      const apicalWeight = isTrunkApex
+        ? 0.55 + 0.4 * apicalDom * trunkClimbBias
+        : Math.max(0.18, apicalDom * 0.45);
       dir = v3normalize([
-        dir[0] * (1 - apicalWeight * 0.45) + apex.axis[0] * apicalWeight * 0.45,
-        dir[1] * (1 - apicalWeight * 0.45) + apex.axis[1] * apicalWeight * 0.45,
-        dir[2] * (1 - apicalWeight * 0.45) + apex.axis[2] * apicalWeight * 0.45,
+        dir[0] * (1 - apicalWeight) + apex.axis[0] * apicalWeight,
+        dir[1] * (1 - apicalWeight) + apex.axis[1] * apicalWeight,
+        dir[2] * (1 - apicalWeight) + apex.axis[2] * apicalWeight,
+      ]);
+      // Trunk also gets a hard upward kick while it's still climbing.
+      if (isTrunkApex) {
+        dir = v3normalize([dir[0], dir[1] + 0.6 * trunkClimbBias, dir[2]]);
+      }
+
+      // Phototropism (sun-seeking) and gravity (droop). Lateral branches arc.
+      const photoStrength = phototropism * (isTrunkApex ? 0.25 : 0.85);
+      const gravityStrength = gravityResp * (isTrunkApex ? 0.05 : 0.45 + apex.level * 0.12);
+      dir = v3normalize([
+        dir[0] + sunDir[0] * photoStrength * 0.25,
+        dir[1] + sunDir[1] * photoStrength * 0.25 - gravityStrength * 0.35,
+        dir[2] + sunDir[2] * photoStrength * 0.25,
       ]);
 
-      // Phototropism (sun-seeking) and gravity (droop).
-      const photoStrength = phototropism * (isTrunkApex ? 0.4 : 0.9);
-      const gravityStrength = gravityResp * (isTrunkApex ? 0.15 : 0.55 + apex.level * 0.1);
-      dir = v3normalize([
-        dir[0] + sunDir[0] * photoStrength * 0.3,
-        dir[1] + sunDir[1] * photoStrength * 0.3 - gravityStrength * 0.4,
-        dir[2] + sunDir[2] * photoStrength * 0.3,
-      ]);
-
-      // Subtle jitter (controlled, not corruption-of-RNG-style)
-      const jit = isTrunkApex ? crookedness * 0.18 : 0.12;
+      // Subtle jitter
+      const jit = isTrunkApex ? crookedness * 0.15 : 0.10;
       dir = v3normalize([
         dir[0] + (rng() - 0.5) * jit,
         dir[1] + (rng() - 0.5) * jit * 0.4,
@@ -434,25 +443,35 @@ export function generateTreeGeometry(params: TreeParams, seed: number = 1337): T
           toKill.push(aIdx);
         }
       }
-
       nodes[apex.nodeId].isApex = false;
 
-      // BIFURCATION: at the start of growth on the trunk apex, spawn lateral branches
-      // proportional to branchSeedCount. This is the only randomness-controlled spawn
-      // point — keeps RNG sequence stable.
-      const isFirstSpawn = isTrunkApex && iter === 0;
-      const spawnLateral = isFirstSpawn ? branchSeedCount :
-        // sustained chance for lateral branching off trunk and lower-order nodes
-        (apex.level < 3 && rng() < 0.18 + 0.05 * apex.level && inf.count > 0 ? 1 : 0);
+      // ── LATERAL BRANCHING ─────────────────────────────────────────────
+      // No giant first-spawn burst. Instead:
+      //  - Trunk: spawn one lateral every ~(stubSteps / branchSeedCount) steps,
+      //    only above firstBranchHeight, capped at branchSeedCount total.
+      //  - Lower-level branches: probabilistic, only when receiving attractor pull.
+      let spawnLateral = 0;
+      if (isTrunkApex) {
+        const trunkLateralSpacing = Math.max(1, Math.floor(skeletonIterations / Math.max(2, branchSeedCount)));
+        const aboveFirstBranch = apexY >= firstBranchHeight * height * 0.95;
+        if (aboveFirstBranch && (apex.pathIdx % trunkLateralSpacing) === 0) {
+          spawnLateral = 1;
+        }
+        // At the apex's "shoulder" (right at firstBranchHeight) seed an extra cluster
+        if (Math.abs(apexY - firstBranchHeight * height) < stepSize * 1.5) {
+          spawnLateral = Math.max(spawnLateral, 2);
+        }
+      } else if (apex.level < 3 && inf.count > 0 && rng() < 0.16 + 0.05 * apex.level) {
+        spawnLateral = 1;
+      }
 
       // Continue this apex
       nextApices.push({ nodeId: newId, level: apex.level, axis: dir, pathIdx: apex.pathIdx + 1 });
 
-      // Spawn lateral apices
+      // Spawn lateral apices — angled out from the parent direction.
       for (let s = 0; s < spawnLateral; s++) {
-        const azimuth = (s / Math.max(1, spawnLateral)) * Math.PI * 2 + rng() * 0.8;
+        const azimuth = rng() * Math.PI * 2;
         const tilt = angleMean + (rng() - 0.5) * angleVar;
-        // Build orthonormal frame around current dir
         const ref: Vec3 = Math.abs(dir[1]) > 0.95 ? [1, 0, 0] : [0, 1, 0];
         const right = v3normalize(v3cross(dir, ref));
         const up = v3normalize(v3cross(right, dir));
