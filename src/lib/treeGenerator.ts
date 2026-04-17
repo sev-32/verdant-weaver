@@ -804,19 +804,20 @@ export function generateTreeGeometry(params: TreeParams, seed: number = 1337): T
     );
   }
 
-  function addLeafCluster(pos: Vec3, dir: Vec3, level: number) {
+  function addLeafCluster(pos: Vec3, dir: Vec3, level: number, densityMul: number = 1.0) {
     if (rng() < canopySparseness) return;
     const speciesBunch = sp.leafBunch;
-    const count = Math.max(4, Math.round(leafClusterSize * speciesBunch * (0.55 + 0.45 * age01) * healthVigor));
-    const clusterRadius = leafSize * sp.leafSize * 4 * leafClusterSpread;
+    const count = Math.max(3, Math.round(leafClusterSize * speciesBunch * densityMul * (0.55 + 0.45 * age01) * healthVigor));
+    // Cluster radius scales with leaf size, capped tight so leaves cling to wood.
+    const clusterRadius = Math.max(0.05, leafSize * sp.leafSize * 2.2 * leafClusterSpread);
     for (let i = 0; i < count; i++) {
       const phi = rng() * Math.PI * 2;
       const cosTheta = rng() * 2 - 1;
-      const r = Math.pow(rng(), 0.5) * clusterRadius;
+      const r = Math.pow(rng(), 0.7) * clusterRadius;
       const sinTheta = Math.sqrt(1 - cosTheta * cosTheta);
       const center: Vec3 = [
         pos[0] + r * sinTheta * Math.cos(phi),
-        pos[1] + r * sinTheta * Math.sin(phi) * 0.7 + r * 0.1,
+        pos[1] + r * sinTheta * Math.sin(phi) * 0.6 + r * 0.05,
         pos[2] + r * cosTheta,
       ];
       const yaw = rng() * Math.PI * 2;
@@ -841,26 +842,23 @@ export function generateTreeGeometry(params: TreeParams, seed: number = 1337): T
     const sampled = sampleBranch(b);
     emitTube(b, sampled, isDead);
 
-    // Foliage: along the upper portion of mid-to-terminal branches, denser at tips.
+    // Foliage: distributed along the OUTER PORTION of every branch, anchored to wood.
+    // Leaves only appear on level >= 1 (no leaves on the trunk itself).
     if (!isDead && b.level >= 1) {
-      const isTerminal = b.nodes.length <= 4 || b.level >= 3;
+      const isTerminal = b.level >= 3 || b.nodes.length <= 3;
       const lastNode = nodes[b.nodes[b.nodes.length - 1]];
-      const consumed = lastNode.consumed;
-      const tipPos = lastNode.pos;
       const tipDir = sampled.tangents[sampled.tangents.length - 1];
 
-      // Place a cluster at every consumed attractor (light-finding leaves).
-      for (const cp of consumed) {
-        addLeafCluster(cp, tipDir, b.level);
+      // Walk the sampled centers and place clusters on the outer 60% of the branch.
+      const totalRings = sampled.centers.length;
+      const startRing = Math.floor(totalRings * 0.4);
+      const ringStep = Math.max(1, Math.floor(totalRings / (isTerminal ? 6 : 3)));
+      for (let i = startRing; i < totalRings; i += ringStep) {
+        const t = i / Math.max(1, totalRings - 1);
+        const densityMul = 0.4 + 0.9 * t;
+        addLeafCluster(sampled.centers[i], sampled.tangents[i], b.level, densityMul * (isTerminal ? 1.2 : 0.7));
       }
-      // Also seed clusters along the terminal portion of the branch.
-      if (isTerminal) {
-        addLeafCluster(tipPos, tipDir, b.level);
-        if (b.nodes.length >= 2) {
-          const midPos = nodes[b.nodes[Math.floor(b.nodes.length * 0.7)]].pos;
-          addLeafCluster(midPos, tipDir, b.level);
-        }
-      }
+      addLeafCluster(lastNode.pos, tipDir, b.level, 1.4);
     }
   }
 
