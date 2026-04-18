@@ -307,12 +307,17 @@ export function generateTreeGeometry(params: TreeParams, seed: number = 1337): T
     attractors.push(p);
   }
 
-  // ─────────────────── 2. SKELETON via SPACE COLONIZATION ─────────────────
-  const stepSize = stepLen > 0 ? stepLen : Math.max(0.08, height / 40);
+  // ─────────────────── 2. SKELETON — PHASED HIERARCHICAL GROWTH ───────────
+  // Phase A: Deterministic trunk Bezier (no SCA competition).
+  // Phase B: Spawn N main scaffolds at trunk nodes via phyllotaxis spiral.
+  // Phase C: SCA on scaffold apices ONLY (trunk is locked) → reach into crown.
+  // Phase D: Forced sub-branching every K steps along each growing branch
+  //          → guarantees order 1 → 2 → 3 → 4 hierarchy.
+  // ------------------------------------------------------------------------
+  const stepSize = stepLen > 0 ? stepLen : Math.max(0.08, height / 42);
   const perception = stepSize * perceptionMul;
   const killDist = stepSize * killMul;
 
-  // Initial trunk seed at origin, growing up + lean.
   const leanDir: Vec3 = v3normalize([
     Math.sin(trunkLeanAngle) + restLean * 0.3,
     Math.cos(trunkLeanAngle),
@@ -327,116 +332,142 @@ export function generateTreeGeometry(params: TreeParams, seed: number = 1337): T
     return n;
   };
 
-  // Pre-grow a small trunk stub up to firstBranchHeight (deterministic core).
-  const stubHeight = Math.max(stepSize * 2, firstBranchHeight * height);
-  let cursor: Vec3 = [0, 0, 0];
-  let lastIdx = newNode(cursor, null, 0, 0).id;
-  const stubSteps = Math.max(2, Math.round(stubHeight / stepSize));
-  for (let i = 1; i <= stubSteps; i++) {
-    const t = i / stubSteps;
-    const wob: Vec3 = [
-      (rng() - 0.5) * crookedness * stepSize * 0.6,
-      stepSize,
-      (rng() - 0.5) * crookedness * stepSize * 0.6,
-    ];
-    cursor = v3add(cursor, [
-      wob[0] + leanDir[0] * stepSize * 0.05,
-      wob[1] * (1 - 0.05) + leanDir[1] * stepSize * 0.05,
-      wob[2] + leanDir[2] * stepSize * 0.05,
-    ]);
-    const n = newNode(cursor, lastIdx, 0, i);
-    lastIdx = n.id;
-  }
-
-  // Active growing tips (apices). Each has a "preferred" axial direction.
-  interface Apex { nodeId: number; level: number; axis: Vec3; pathIdx: number; }
-  const apices: Apex[] = [{ nodeId: lastIdx, level: 0, axis: leanDir, pathIdx: stubSteps }];
-
-  // Photo-tropism global pull (sun-direction in horizontal plane + up).
   const sunDir: Vec3 = v3normalize([Math.sin(photoDir) * 0.3, 1.0, Math.cos(photoDir) * 0.3]);
 
-  // SCA loop
+  // ── PHASE A: TRUNK ───────────────────────────────────────────────────────
+  // Trunk grows from base to ~ crown top. Apical dominance scales how much of
+  // the tree height the trunk will reach (1.0 = pierce all the way through,
+  // 0.4 = stops at first branch height, deliquescent / decurrent split).
+  const trunkReachFrac = clamp(0.55 + 0.45 * (apicalDom - 0.5), 0.45, 1.05);
+  const trunkTopY = height * trunkReachFrac;
+  const trunkSteps = Math.max(8, Math.round(trunkTopY / stepSize));
+
+  // Build trunk path with smooth curvature (NOT random per-step jitter only).
+  // Two control vectors create a graceful S-curve based on crookedness + lean.
+  const trunkSwayAxis = rng() * Math.PI * 2;
+  const trunkSwayMag = crookedness * height * 0.08;
+  let trunkLastId = newNode([0, 0, 0], null, 0, 0).id;
+  for (let i = 1; i <= trunkSteps; i++) {
+    const t = i / trunkSteps;
+    // Smooth lateral sway (low-frequency sine, NOT noise)
+    const swayX = Math.cos(trunkSwayAxis) * Math.sin(t * Math.PI * 1.4) * trunkSwayMag;
+    const swayZ = Math.sin(trunkSwayAxis) * Math.sin(t * Math.PI * 1.4) * trunkSwayMag;
+    // Subtle high-freq crookedness on top
+    const microX = (rng() - 0.5) * crookedness * stepSize * 0.25;
+    const microZ = (rng() - 0.5) * crookedness * stepSize * 0.25;
+    // Lean accumulates with height
+    const leanX = leanDir[0] * trunkTopY * t * 0.3;
+    const leanZ = leanDir[2] * trunkTopY * t * 0.3;
+    const pos: Vec3 = [swayX + microX + leanX, t * trunkTopY, swayZ + microZ + leanZ];
+    const n = newNode(pos, trunkLastId, 0, i);
+    trunkLastId = n.id;
+  }
+
+  // ── PHASE B: SCAFFOLD BRANCH SPAWN (golden-angle phyllotaxis) ────────────
+  interface Apex { nodeId: number; level: number; axis: Vec3; pathIdx: number; stepsLeft: number; lastForkAt: number; }
+  const apices: Apex[] = [];
+
+  // Decide which trunk nodes get a scaffold. We want `branchSeedCount` scaffolds
+  // distributed from firstBranchHeight up to ~95% of trunk length.
+  const firstScaffoldStep = Math.max(1, Math.round((firstBranchHeight * height / trunkTopY) * trunkSteps));
+  const lastScaffoldStep = Math.max(firstScaffoldStep + 1, Math.round(trunkSteps * 0.95));
+  const phyllotaxisStep = (137.5 * Math.PI) / 180; // golden angle in radians
+  let phylloAngle = rng() * Math.PI * 2;
+
+  for (let s = 0; s < branchSeedCount; s++) {
+    const tt = s / Math.max(1, branchSeedCount - 1);
+    // Bias scaffolds toward the upper trunk where the canopy lives
+    const biased = Math.pow(tt, 0.85);
+    const stepIdx = Math.round(firstScaffoldStep + (lastScaffoldStep - firstScaffoldStep) * biased);
+    const trunkNodeId = stepIdx; // node index == step index by construction
+    if (trunkNodeId >= nodes.length) continue;
+
+    phylloAngle += phyllotaxisStep;
+    const azimuth = phylloAngle + (rng() - 0.5) * 0.25;
+    // Larger angles low on the trunk (older branches droop out), narrower up top
+    const heightFrac = stepIdx / trunkSteps;
+    const tiltMul = 1.0 - heightFrac * 0.45;
+    const tilt = (angleMean + (rng() - 0.5) * angleVar) * tiltMul;
+    // Build axis: tilt off the vertical toward azimuth direction
+    const axis: Vec3 = v3normalize([
+      Math.sin(tilt) * Math.cos(azimuth),
+      Math.cos(tilt),
+      Math.sin(tilt) * Math.sin(azimuth),
+    ]);
+    // Scaffold gets a length budget proportional to its trunk position & length ratio
+    const scaffoldLen = (height - nodes[trunkNodeId].pos[1]) * 0.55 + height * 0.15;
+    const scaffoldSteps = Math.max(4, Math.round(scaffoldLen / stepSize));
+    apices.push({ nodeId: trunkNodeId, level: 1, axis, pathIdx: 0, stepsLeft: scaffoldSteps, lastForkAt: 0 });
+  }
+
+  // ── PHASE C+D: GROW SCAFFOLDS WITH SCA + FORCED SUB-BRANCHING ────────────
   const liveAttractors = new Set<number>();
   for (let i = 0; i < attractors.length; i++) liveAttractors.add(i);
 
-  for (let iter = 0; iter < skeletonIterations && liveAttractors.size > 0 && apices.length > 0; iter++) {
-    // For each active apex, accumulate pulling vectors from attractors within perception.
-    const apexInfluences = new Map<number, { sum: Vec3; count: number; consumed: number[] }>();
-    for (const a of apices) apexInfluences.set(a.nodeId, { sum: [0,0,0], count: 0, consumed: [] });
+  // Target sub-branch spacing per order (in steps): higher orders fork more often.
+  const forkSpacing = (lvl: number) => Math.max(2, Math.round(6 - lvl * 1.2));
+  const maxOrder = clamp(getP("maxOrder", "vegetation.branching.maxOrder", 4) as number, 2, 6) as number;
 
-    // Bucket each live attractor onto its closest apex (Runions: closest node only).
+  for (let iter = 0; iter < skeletonIterations && apices.length > 0; iter++) {
+    const apexInfluences = new Map<number, { sum: Vec3; count: number; consumed: number[] }>();
+    for (const a of apices) {
+      // unique key per apex (nodeId may repeat across newly-spawned siblings; use index)
+      apexInfluences.set(a.nodeId * 100000 + a.level * 1000 + iter, { sum: [0,0,0], count: 0, consumed: [] });
+    }
+    // Build bucket: each attractor -> closest apex within perception
+    const apexKeys: number[] = [];
+    apices.forEach((a) => apexKeys.push(a.nodeId * 100000 + a.level * 1000 + iter));
+
     const toKill: number[] = [];
     liveAttractors.forEach((aIdx) => {
       const ap = attractors[aIdx];
-      let bestApex = -1;
-      let bestDist = perception;
-      for (const apex of apices) {
-        const d = v3len(v3sub(ap, nodes[apex.nodeId].pos));
-        if (d < bestDist) { bestDist = d; bestApex = apex.nodeId; }
+      let bestI = -1, bestDist = perception;
+      for (let ai = 0; ai < apices.length; ai++) {
+        const d = v3len(v3sub(ap, nodes[apices[ai].nodeId].pos));
+        if (d < bestDist) { bestDist = d; bestI = ai; }
       }
-      if (bestApex >= 0) {
-        const inf = apexInfluences.get(bestApex)!;
-        const dir = v3normalize(v3sub(ap, nodes[bestApex].pos));
+      if (bestI >= 0) {
+        const inf = apexInfluences.get(apexKeys[bestI])!;
+        const dir = v3normalize(v3sub(ap, nodes[apices[bestI].nodeId].pos));
         inf.sum = v3add(inf.sum, dir);
         inf.count++;
         if (bestDist < killDist) inf.consumed.push(aIdx);
       }
     });
 
-    // Grow each apex by one step (or branch).
     const nextApices: Apex[] = [];
-    for (const apex of apices) {
-      const inf = apexInfluences.get(apex.nodeId)!;
-      const isTrunkApex = apex.level === 0;
-      const apexY = nodes[apex.nodeId].pos[1];
+    for (let ai = 0; ai < apices.length; ai++) {
+      const apex = apices[ai];
+      if (apex.stepsLeft <= 0) continue;
+      const inf = apexInfluences.get(apexKeys[ai])!;
 
-      // Direction = blend(attractor pull, axial bias, photo, gravity, jitter).
-      let dir: Vec3 = [0, 0, 0];
-      if (inf.count > 0) {
-        dir = v3normalize(inf.sum);
-      } else {
-        // No attractors in range — keep going along axis.
-        dir = apex.axis;
-      }
-
-      // Apical dominance — trunk MUST keep climbing. Strong upward bias for trunk
-      // until it has reached at least crownCenterY; lateral apices respect their axis less.
-      const trunkClimbBias = isTrunkApex ? clamp(1 - (apexY / Math.max(0.1, height * 0.95)), 0.15, 1.0) : 0;
-      const apicalWeight = isTrunkApex
-        ? 0.55 + 0.4 * apicalDom * trunkClimbBias
-        : Math.max(0.18, apicalDom * 0.45);
+      // Direction blend
+      let dir: Vec3 = inf.count > 0 ? v3normalize(inf.sum) : apex.axis;
+      const apicalWeight = clamp(0.35 + 0.35 * apicalDom - apex.level * 0.04, 0.15, 0.85);
       dir = v3normalize([
         dir[0] * (1 - apicalWeight) + apex.axis[0] * apicalWeight,
         dir[1] * (1 - apicalWeight) + apex.axis[1] * apicalWeight,
         dir[2] * (1 - apicalWeight) + apex.axis[2] * apicalWeight,
       ]);
-      // Trunk also gets a hard upward kick while it's still climbing.
-      if (isTrunkApex) {
-        dir = v3normalize([dir[0], dir[1] + 0.6 * trunkClimbBias, dir[2]]);
-      }
-
-      // Phototropism (sun-seeking) and gravity (droop). Lateral branches arc.
-      const photoStrength = phototropism * (isTrunkApex ? 0.25 : 0.85);
-      const gravityStrength = gravityResp * (isTrunkApex ? 0.05 : 0.45 + apex.level * 0.12);
+      // Tropisms — heavier on higher orders
+      const photoStrength = phototropism * (0.4 + 0.2 * apex.level);
+      const gravityStrength = gravityResp * (0.3 + 0.18 * apex.level);
       dir = v3normalize([
         dir[0] + sunDir[0] * photoStrength * 0.25,
-        dir[1] + sunDir[1] * photoStrength * 0.25 - gravityStrength * 0.35,
+        dir[1] + sunDir[1] * photoStrength * 0.25 - gravityStrength * 0.4,
         dir[2] + sunDir[2] * photoStrength * 0.25,
       ]);
-
-      // Subtle jitter
-      const jit = isTrunkApex ? crookedness * 0.15 : 0.10;
+      // Order-scaled jitter — twigs are wigglier than scaffolds
+      const jit = 0.06 + apex.level * 0.045;
       dir = v3normalize([
         dir[0] + (rng() - 0.5) * jit,
-        dir[1] + (rng() - 0.5) * jit * 0.4,
+        dir[1] + (rng() - 0.5) * jit * 0.5,
         dir[2] + (rng() - 0.5) * jit,
       ]);
 
-      // Step forward
-      const newPos: Vec3 = v3add(nodes[apex.nodeId].pos, v3scale(dir, stepSize));
+      const newPos: Vec3 = v3add(nodes[apex.nodeId].pos, v3scale(dir, stepSize * (0.85 + apex.level * 0.05)));
       const newId = newNode(newPos, apex.nodeId, apex.level, apex.pathIdx + 1).id;
 
-      // Mark consumed attractors at this node (foliage seeds).
       if (inf.consumed.length > 0) {
         for (const aIdx of inf.consumed) {
           nodes[newId].consumed.push(attractors[aIdx]);
@@ -445,50 +476,42 @@ export function generateTreeGeometry(params: TreeParams, seed: number = 1337): T
       }
       nodes[apex.nodeId].isApex = false;
 
-      // ── LATERAL BRANCHING ─────────────────────────────────────────────
-      // No giant first-spawn burst. Instead:
-      //  - Trunk: spawn one lateral every ~(stubSteps / branchSeedCount) steps,
-      //    only above firstBranchHeight, capped at branchSeedCount total.
-      //  - Lower-level branches: probabilistic, only when receiving attractor pull.
-      let spawnLateral = 0;
-      if (isTrunkApex) {
-        const trunkLateralSpacing = Math.max(1, Math.floor(skeletonIterations / Math.max(2, branchSeedCount)));
-        const aboveFirstBranch = apexY >= firstBranchHeight * height * 0.95;
-        if (aboveFirstBranch && (apex.pathIdx % trunkLateralSpacing) === 0) {
-          spawnLateral = 1;
-        }
-        // At the apex's "shoulder" (right at firstBranchHeight) seed an extra cluster
-        if (Math.abs(apexY - firstBranchHeight * height) < stepSize * 1.5) {
-          spawnLateral = Math.max(spawnLateral, 2);
-        }
-      } else if (apex.level < 3 && inf.count > 0 && rng() < 0.16 + 0.05 * apex.level) {
-        spawnLateral = 1;
+      // ── FORCED SUB-BRANCHING (the hierarchy we were missing) ────────────
+      const newPathIdx = apex.pathIdx + 1;
+      let spawnFork = false;
+      if (apex.level < maxOrder && (newPathIdx - apex.lastForkAt) >= forkSpacing(apex.level)) {
+        spawnFork = rng() < clamp(0.55 + 0.15 * apex.level, 0.4, 0.95);
       }
 
       // Continue this apex
-      nextApices.push({ nodeId: newId, level: apex.level, axis: dir, pathIdx: apex.pathIdx + 1 });
+      nextApices.push({
+        nodeId: newId, level: apex.level, axis: dir,
+        pathIdx: newPathIdx, stepsLeft: apex.stepsLeft - 1,
+        lastForkAt: spawnFork ? newPathIdx : apex.lastForkAt,
+      });
 
-      // Spawn lateral apices — angled out from the parent direction.
-      for (let s = 0; s < spawnLateral; s++) {
+      if (spawnFork) {
         const azimuth = rng() * Math.PI * 2;
-        const tilt = angleMean + (rng() - 0.5) * angleVar;
+        const tilt = angleMean * (0.7 + apex.level * 0.1) + (rng() - 0.5) * angleVar;
         const ref: Vec3 = Math.abs(dir[1]) > 0.95 ? [1, 0, 0] : [0, 1, 0];
         const right = v3normalize(v3cross(dir, ref));
         const up = v3normalize(v3cross(right, dir));
-        const lateral = v3normalize(v3add(
+        const childAxis = v3normalize(v3add(
           v3scale(dir, Math.cos(tilt)),
           v3add(v3scale(right, Math.sin(tilt) * Math.cos(azimuth)), v3scale(up, Math.sin(tilt) * Math.sin(azimuth)))
         ));
-        nextApices.push({ nodeId: newId, level: apex.level + 1, axis: lateral, pathIdx: 0 });
+        const childSteps = Math.max(2, Math.round(apex.stepsLeft * (0.45 + 0.15 * rng())));
+        nextApices.push({
+          nodeId: newId, level: apex.level + 1, axis: childAxis,
+          pathIdx: 0, stepsLeft: childSteps, lastForkAt: 0,
+        });
       }
     }
 
     for (const k of toKill) liveAttractors.delete(k);
     apices.length = 0;
     apices.push(...nextApices);
-
-    // Cap total nodes to prevent runaway
-    if (nodes.length > 4500) break;
+    if (nodes.length > 5500) break;
   }
 
   // ─────────────────── 3. PIPE MODEL — radii from leaves to root ─────────
