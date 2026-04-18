@@ -686,19 +686,17 @@ export function generateTreeGeometry(params: TreeParams, seed: number = 1337): T
       prevUp = up;
 
       // ─── continuous junction blending (replaces "collar" geometry) ───
-      // For every child attachment near this t, swell the parent radius
-      // anisotropically toward the child's outgoing direction.
+      // Tightened: smaller window, weaker on trunk to avoid bulgy top.
       let baseR = radii[i];
-
-      // Pipe-radius² accumulation for the metaball blend
       let unionRSq = baseR * baseR;
       const blendDirs: { dir: Vec3; weight: number; }[] = [];
+      const blendStrengthLocal = b.level === 0 ? junctionBlendStr * 0.45 : junctionBlendStr;
+      const blendWindowLocal = b.level === 0 ? junctionBlendLen * 0.5 : junctionBlendLen;
       for (const att of attachments) {
         const dt = Math.abs(tParam - att.parentT);
-        const window = junctionBlendLen;
-        if (dt > window) continue;
-        const w = (1 - dt / window) ** 2 * junctionBlendStr;
-        unionRSq += (att.childRadius * att.childRadius) * w * 0.85;
+        if (dt > blendWindowLocal) continue;
+        const w = (1 - dt / blendWindowLocal) ** 2 * blendStrengthLocal;
+        unionRSq += (att.childRadius * att.childRadius) * w * 0.7;
         blendDirs.push({ dir: att.childDir, weight: w });
       }
       let blendedR = Math.sqrt(unionRSq);
