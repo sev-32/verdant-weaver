@@ -372,8 +372,8 @@ export default function Rock3DPreview({ params, seed = 42, className = "" }: Roc
     // Transform controls (gizmo)
     const transformControls = new TransformControls(camera, renderer.domElement);
     transformControls.setSize(0.7);
-    transformControls.addEventListener("dragging-changed", (e: { value: boolean }) => {
-      controls.enabled = !e.value;
+    transformControls.addEventListener("dragging-changed", (e) => {
+      controls.enabled = !(e as unknown as { value: boolean }).value;
     });
     transformControls.addEventListener("objectChange", () => {
       const obj = transformControls.object as THREE.Mesh | null;
