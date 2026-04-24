@@ -86,6 +86,27 @@ export const DEFAULT_ROCK_PARAMS: RockParams = {
   seed: 42,
   groundEmbed: 0.15,
   rotation: 0,
+
+  // ═══════════════════════════════════════
+  // MANUAL SHAPE BUILDER
+  // When enabled, the icosphere is replaced by the SDF of the user-built
+  // composition (primitives + metaballs). Fidelity sliders control how
+  // much the procedural pipeline is allowed to deviate from that base.
+  // ═══════════════════════════════════════
+  builderEnabled: false,
+  /** 0 = full procedural freedom, 1 = silhouette is locked */
+  builderSilhouetteFidelity: 0.55,
+  /** 0 = no surface noise, 1 = full surface displacement */
+  builderSurfaceFidelity: 1.0,
+  /** 0 = no erosion changes, 1 = full erosion influence */
+  builderErosionFidelity: 1.0,
+  /** Metaball blend smoothness (k for smin) */
+  builderMetaballSmoothness: 0.35,
+  /** Show wireframe overlay of builder primitives in viewport */
+  builderShowOverlay: true,
+  /** Resolution multiplier for surface sampling (icosphere subs already drives this) */
+  builderSampleResolution: 1.0,
+
   // Asymmetry
   asymmetryX: 0.0,
   asymmetryY: 0.0,
