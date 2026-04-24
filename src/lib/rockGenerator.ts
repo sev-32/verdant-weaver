@@ -1,4 +1,5 @@
-import type { RockParams } from "@/types/rockParams";
+import type { RockParams, BuilderShape } from "@/types/rockParams";
+import { builderRayHit, builderBoundingRadius } from "@/lib/builderShape";
 
 type Vec3 = [number, number, number];
 
@@ -152,7 +153,11 @@ export interface RockGeometry {
   meta: { vertCount: number; triCount: number; bounds: Vec3 };
 }
 
-export function generateRockGeometry(params: RockParams, seedOverride?: number): RockGeometry {
+export function generateRockGeometry(
+  params: RockParams,
+  seedOverride?: number,
+  builderShapes?: BuilderShape[],
+): RockGeometry {
   const seed = (seedOverride ?? (params.seed as number)) || 42;
   const rng = mulberry32(seed);
 
@@ -229,6 +234,25 @@ export function generateRockGeometry(params: RockParams, seedOverride?: number):
   const ico = createIcosphere(subs);
   const verts = ico.positions.map(v => [...v] as Vec3);
 
+  // ─── Manual Builder Shape ─────────────────────────────────────────────
+  // Pre-sample the builder SDF along each icosphere direction so the
+  // procedural deformation can layer on top of the user's silhouette.
+  const builderEnabled = !!params.builderEnabled && !!builderShapes && builderShapes.length > 0;
+  const builderSilFid = (params.builderSilhouetteFidelity as number) ?? 0.55;
+  const builderSurfFid = (params.builderSurfaceFidelity as number) ?? 1.0;
+  const builderEroFid = (params.builderErosionFidelity as number) ?? 1.0;
+  const builderSmooth = (params.builderMetaballSmoothness as number) ?? 0.35;
+  const builderRadii: number[] = new Array(verts.length).fill(1);
+  let builderBound = 1;
+  if (builderEnabled && builderShapes) {
+    builderBound = builderBoundingRadius(builderShapes);
+    for (let i = 0; i < verts.length; i++) {
+      const dir = v3normalize(verts[i]);
+      const hit = builderRayHit(dir, builderShapes, builderSmooth, builderBound * 2.5, 80);
+      builderRadii[i] = hit ?? builderBound; // fallback to bound if no hit
+    }
+  }
+
   // Apply displacement
   for (let i = 0; i < verts.length; i++) {
     const v = verts[i];
@@ -280,12 +304,31 @@ export function generateRockGeometry(params: RockParams, seedOverride?: number):
       }
     }
 
-    const finalScale = scale * (1 + disp * dispStr);
-    verts[i] = [
-      n[0] * finalScale * sx,
-      n[1] * finalScale * sy,
-      n[2] * finalScale * sz,
-    ];
+    let finalScale: number;
+    if (builderEnabled) {
+      // Base radius comes from the builder SDF along this direction.
+      const baseR = builderRadii[i];
+      // Surface noise & erosion magnitude, attenuated by their fidelity sliders.
+      const surfDisp = disp * dispStr * builderSurfFid;
+      const eroPart  = (erosStr > 0 ? builderEroFid : 1.0);
+      // How much the silhouette can wander away from baseR (in world units).
+      // High silhouette fidelity (->1) clamps the deviation toward 0.
+      const wander = (1 - builderSilFid) * baseR * 0.55;
+      const offset = surfDisp * wander * eroPart;
+      finalScale = baseR + offset;
+      verts[i] = [
+        n[0] * finalScale * sx,
+        n[1] * finalScale * sy,
+        n[2] * finalScale * sz,
+      ];
+    } else {
+      finalScale = scale * (1 + disp * dispStr);
+      verts[i] = [
+        n[0] * finalScale * sx,
+        n[1] * finalScale * sy,
+        n[2] * finalScale * sz,
+      ];
+    }
 
     if (groundEmbed > 0) {
       verts[i][1] += scale * groundEmbed;

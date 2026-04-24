@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
 import { DEFAULT_TREE_PARAMS, type TreeParams } from "@/types/treeParams";
-import { DEFAULT_ROCK_PARAMS, type RockParams, type SavedRock, type SceneRock } from "@/types/rockParams";
+import { DEFAULT_ROCK_PARAMS, DEFAULT_BUILDER_SHAPE, type RockParams, type SavedRock, type SceneRock, type BuilderShape, type BuilderShapeKind } from "@/types/rockParams";
 
 const MIN_DRAWER = 280;
 const MAX_DRAWER = 480;
@@ -66,6 +66,8 @@ interface ProVegLayoutState {
   viewportSettings: ViewportSettings;
   savedRocks: SavedRock[];
   sceneRocks: SceneRock[];
+  builderShapes: BuilderShape[];
+  selectedBuilderShapeId: string | null;
 }
 
 interface ProVegLayoutContextValue extends ProVegLayoutState {
@@ -96,6 +98,12 @@ interface ProVegLayoutContextValue extends ProVegLayoutState {
   addRockToScene: (savedRockId: string) => void;
   removeRockFromScene: (sceneRockId: string) => void;
   updateSceneRock: (sceneRockId: string, patch: Partial<SceneRock>) => void;
+  addBuilderShape: (kind: BuilderShapeKind) => void;
+  updateBuilderShape: (id: string, patch: Partial<BuilderShape>) => void;
+  removeBuilderShape: (id: string) => void;
+  duplicateBuilderShape: (id: string) => void;
+  clearBuilderShapes: () => void;
+  setSelectedBuilderShape: (id: string | null) => void;
   minDrawerWidth: number;
   maxDrawerWidth: number;
 }
@@ -121,6 +129,8 @@ const defaultState: ProVegLayoutState = {
   viewportSettings: { ...DEFAULT_VIEWPORT_SETTINGS },
   savedRocks: [],
   sceneRocks: [],
+  builderShapes: [],
+  selectedBuilderShapeId: null,
 };
 
 const ProVegLayoutContext = createContext<ProVegLayoutContextValue | null>(null);
@@ -198,6 +208,66 @@ export function ProVegLayoutProvider({ children }: { children: React.ReactNode }
     }));
   }, []);
 
+  const addBuilderShape = useCallback((kind: BuilderShapeKind) => {
+    setState((s) => {
+      const id = `bs_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      const count = s.builderShapes.length + 1;
+      const labels: Record<BuilderShapeKind, string> = {
+        box: "Box", sphere: "Sphere", cylinder: "Cylinder", cone: "Cone", metaball: "Metaball",
+      };
+      const shape: BuilderShape = {
+        ...DEFAULT_BUILDER_SHAPE,
+        kind,
+        id,
+        label: `${labels[kind]} ${count}`,
+      };
+      return {
+        ...s,
+        builderShapes: [...s.builderShapes, shape],
+        selectedBuilderShapeId: id,
+        rockParams: { ...s.rockParams, builderEnabled: true },
+      };
+    });
+  }, []);
+
+  const updateBuilderShape = useCallback((id: string, patch: Partial<BuilderShape>) => {
+    setState((s) => ({
+      ...s,
+      builderShapes: s.builderShapes.map((b) => (b.id === id ? { ...b, ...patch } : b)),
+    }));
+  }, []);
+
+  const removeBuilderShape = useCallback((id: string) => {
+    setState((s) => ({
+      ...s,
+      builderShapes: s.builderShapes.filter((b) => b.id !== id),
+      selectedBuilderShapeId: s.selectedBuilderShapeId === id ? null : s.selectedBuilderShapeId,
+    }));
+  }, []);
+
+  const duplicateBuilderShape = useCallback((id: string) => {
+    setState((s) => {
+      const src = s.builderShapes.find((b) => b.id === id);
+      if (!src) return s;
+      const newId = `bs_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      const copy: BuilderShape = {
+        ...src,
+        id: newId,
+        label: `${src.label} copy`,
+        position: [src.position[0] + 0.4, src.position[1], src.position[2] + 0.4],
+      };
+      return { ...s, builderShapes: [...s.builderShapes, copy], selectedBuilderShapeId: newId };
+    });
+  }, []);
+
+  const clearBuilderShapes = useCallback(() => {
+    setState((s) => ({ ...s, builderShapes: [], selectedBuilderShapeId: null }));
+  }, []);
+
+  const setSelectedBuilderShape = useCallback((id: string | null) => {
+    setState((s) => ({ ...s, selectedBuilderShapeId: id }));
+  }, []);
+
   const value: ProVegLayoutContextValue = {
     ...state,
     setTreeParam,
@@ -209,7 +279,7 @@ export function ProVegLayoutProvider({ children }: { children: React.ReactNode }
       setState((s) => ({
         ...s,
         studioMode: mode,
-        rightPanel: mode === "rock" ? "rock-shape" : "trunk",
+        rightPanel: mode === "rock" ? "rock-builder" : "trunk",
         rightSubTab: "",
         leftPanel: "presets",
       })),
@@ -248,6 +318,12 @@ export function ProVegLayoutProvider({ children }: { children: React.ReactNode }
     addRockToScene,
     removeRockFromScene,
     updateSceneRock,
+    addBuilderShape,
+    updateBuilderShape,
+    removeBuilderShape,
+    duplicateBuilderShape,
+    clearBuilderShapes,
+    setSelectedBuilderShape,
     minDrawerWidth: MIN_DRAWER,
     maxDrawerWidth: MAX_DRAWER,
   };

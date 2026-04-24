@@ -31,6 +31,48 @@ export interface SceneRock {
   label: string;
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Manual Shape Builder
+// Compose primitives + metaballs into a base shape, then let the rock
+// engine deform / texture it. Fidelity sliders control how strongly the
+// procedural pipeline is allowed to deviate from the manual silhouette.
+// ─────────────────────────────────────────────────────────────────────────
+export type BuilderShapeKind =
+  | "box"
+  | "sphere"
+  | "cylinder"
+  | "cone"
+  | "metaball";
+
+export interface BuilderShape {
+  id: string;
+  kind: BuilderShapeKind;
+  /** "subtract" carves volume away (CSG difference). Metaballs ignore this. */
+  op: "add" | "subtract";
+  position: [number, number, number];
+  /** Euler radians */
+  rotation: [number, number, number];
+  /** Half-size (box) / radii (sphere/cylinder/cone) per axis */
+  scale: [number, number, number];
+  /** Metaball field radius (only used when kind==='metaball') */
+  blobRadius: number;
+  /** Metaball influence weight (positive = bulge, negative = pit) */
+  blobStrength: number;
+  visible: boolean;
+  label: string;
+}
+
+export const DEFAULT_BUILDER_SHAPE: Omit<BuilderShape, "id" | "label"> = {
+  kind: "sphere",
+  op: "add",
+  position: [0, 0, 0],
+  rotation: [0, 0, 0],
+  scale: [1, 1, 1],
+  blobRadius: 0.8,
+  blobStrength: 1.0,
+  visible: true,
+};
+
 export const DEFAULT_ROCK_PARAMS: RockParams = {
   // ═══════════════════════════════════════
   // SHAPE & GEOMETRY
@@ -44,6 +86,27 @@ export const DEFAULT_ROCK_PARAMS: RockParams = {
   seed: 42,
   groundEmbed: 0.15,
   rotation: 0,
+
+  // ═══════════════════════════════════════
+  // MANUAL SHAPE BUILDER
+  // When enabled, the icosphere is replaced by the SDF of the user-built
+  // composition (primitives + metaballs). Fidelity sliders control how
+  // much the procedural pipeline is allowed to deviate from that base.
+  // ═══════════════════════════════════════
+  builderEnabled: false,
+  /** 0 = full procedural freedom, 1 = silhouette is locked */
+  builderSilhouetteFidelity: 0.55,
+  /** 0 = no surface noise, 1 = full surface displacement */
+  builderSurfaceFidelity: 1.0,
+  /** 0 = no erosion changes, 1 = full erosion influence */
+  builderErosionFidelity: 1.0,
+  /** Metaball blend smoothness (k for smin) */
+  builderMetaballSmoothness: 0.35,
+  /** Show wireframe overlay of builder primitives in viewport */
+  builderShowOverlay: true,
+  /** Resolution multiplier for surface sampling (icosphere subs already drives this) */
+  builderSampleResolution: 1.0,
+
   // Asymmetry
   asymmetryX: 0.0,
   asymmetryY: 0.0,

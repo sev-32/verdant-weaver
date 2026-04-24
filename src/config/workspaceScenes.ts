@@ -92,6 +92,7 @@ export const RIGHT_PANELS: RightPanelConfig[] = [
 
 // Rock editor panels
 export const ROCK_RIGHT_PANELS: RightPanelConfig[] = [
+  { id: "rock-builder", label: "Builder", icon: "Boxes", subTabs: [] },
   { id: "rock-shape", label: "Shape", icon: "Hexagon", subTabs: [] },
   { id: "rock-terrain", label: "Terrain", icon: "Mountain", subTabs: [] },
   { id: "rock-displacement", label: "Displacement", icon: "Waves", subTabs: [] },
